@@ -1,49 +1,56 @@
 import { Card, RANK_LABELS, SUIT_SYMBOLS } from '@sylhet/shared';
 
+// Row y-positions are spread evenly across a 0.16-0.87 band. That band isn't
+// arbitrary: with dominant-baseline="middle" text at the doubled pip font
+// size, measured glyph boxes extend ~47px above and ~36px below their
+// nominal y - so the outermost rows need that much clearance from the card's
+// top/bottom edges (y=2 / y=334 in the 240x336 viewBox) or they clip. Each
+// rank keeps its original pip's upright/rotated orientation (matched by
+// position in the sorted row list) - only the row spacing changed.
 const PIP_LAYOUTS: Record<number, { x: number; y: number; rot?: number }[]> = {
-  2: [{ x: 0.5, y: 0.2 }, { x: 0.5, y: 0.8, rot: 180 }],
-  3: [{ x: 0.5, y: 0.18 }, { x: 0.5, y: 0.5 }, { x: 0.5, y: 0.82, rot: 180 }],
+  2: [{ x: 0.5, y: 0.16 }, { x: 0.5, y: 0.87, rot: 180 }],
+  3: [{ x: 0.5, y: 0.16 }, { x: 0.5, y: 0.515 }, { x: 0.5, y: 0.87, rot: 180 }],
   4: [
-    { x: 0.28, y: 0.18 }, { x: 0.72, y: 0.18 },
-    { x: 0.28, y: 0.82, rot: 180 }, { x: 0.72, y: 0.82, rot: 180 },
+    { x: 0.28, y: 0.16 }, { x: 0.72, y: 0.16 },
+    { x: 0.28, y: 0.87, rot: 180 }, { x: 0.72, y: 0.87, rot: 180 },
   ],
   5: [
-    { x: 0.28, y: 0.18 }, { x: 0.72, y: 0.18 },
-    { x: 0.5, y: 0.5 },
-    { x: 0.28, y: 0.82, rot: 180 }, { x: 0.72, y: 0.82, rot: 180 },
+    { x: 0.28, y: 0.16 }, { x: 0.72, y: 0.16 },
+    { x: 0.5, y: 0.515 },
+    { x: 0.28, y: 0.87, rot: 180 }, { x: 0.72, y: 0.87, rot: 180 },
   ],
   6: [
-    { x: 0.28, y: 0.18 }, { x: 0.72, y: 0.18 },
-    { x: 0.28, y: 0.5 }, { x: 0.72, y: 0.5 },
-    { x: 0.28, y: 0.82, rot: 180 }, { x: 0.72, y: 0.82, rot: 180 },
+    { x: 0.28, y: 0.16 }, { x: 0.72, y: 0.16 },
+    { x: 0.28, y: 0.515 }, { x: 0.72, y: 0.515 },
+    { x: 0.28, y: 0.87, rot: 180 }, { x: 0.72, y: 0.87, rot: 180 },
   ],
   7: [
     { x: 0.28, y: 0.16 }, { x: 0.72, y: 0.16 },
-    { x: 0.5, y: 0.32 },
-    { x: 0.28, y: 0.5 }, { x: 0.72, y: 0.5 },
-    { x: 0.28, y: 0.84, rot: 180 }, { x: 0.72, y: 0.84, rot: 180 },
+    { x: 0.5, y: 0.3967 },
+    { x: 0.28, y: 0.6333 }, { x: 0.72, y: 0.6333 },
+    { x: 0.28, y: 0.87, rot: 180 }, { x: 0.72, y: 0.87, rot: 180 },
   ],
   8: [
-    { x: 0.28, y: 0.14 }, { x: 0.72, y: 0.14 },
-    { x: 0.5, y: 0.3 },
-    { x: 0.28, y: 0.46 }, { x: 0.72, y: 0.46 },
-    { x: 0.5, y: 0.7, rot: 180 },
-    { x: 0.28, y: 0.86, rot: 180 }, { x: 0.72, y: 0.86, rot: 180 },
+    { x: 0.28, y: 0.16 }, { x: 0.72, y: 0.16 },
+    { x: 0.5, y: 0.3375 },
+    { x: 0.28, y: 0.515 }, { x: 0.72, y: 0.515 },
+    { x: 0.5, y: 0.6925, rot: 180 },
+    { x: 0.28, y: 0.87, rot: 180 }, { x: 0.72, y: 0.87, rot: 180 },
   ],
   9: [
-    { x: 0.28, y: 0.14 }, { x: 0.72, y: 0.14 },
-    { x: 0.28, y: 0.36 }, { x: 0.72, y: 0.36 },
-    { x: 0.5, y: 0.5 },
-    { x: 0.28, y: 0.64, rot: 180 }, { x: 0.72, y: 0.64, rot: 180 },
-    { x: 0.28, y: 0.86, rot: 180 }, { x: 0.72, y: 0.86, rot: 180 },
+    { x: 0.28, y: 0.16 }, { x: 0.72, y: 0.16 },
+    { x: 0.28, y: 0.3375 }, { x: 0.72, y: 0.3375 },
+    { x: 0.5, y: 0.515 },
+    { x: 0.28, y: 0.6925, rot: 180 }, { x: 0.72, y: 0.6925, rot: 180 },
+    { x: 0.28, y: 0.87, rot: 180 }, { x: 0.72, y: 0.87, rot: 180 },
   ],
   10: [
-    { x: 0.28, y: 0.12 }, { x: 0.72, y: 0.12 },
-    { x: 0.5, y: 0.24 },
-    { x: 0.28, y: 0.34 }, { x: 0.72, y: 0.34 },
-    { x: 0.28, y: 0.66, rot: 180 }, { x: 0.72, y: 0.66, rot: 180 },
-    { x: 0.5, y: 0.76, rot: 180 },
-    { x: 0.28, y: 0.88, rot: 180 }, { x: 0.72, y: 0.88, rot: 180 },
+    { x: 0.28, y: 0.16 }, { x: 0.72, y: 0.16 },
+    { x: 0.5, y: 0.302 },
+    { x: 0.28, y: 0.444 }, { x: 0.72, y: 0.444 },
+    { x: 0.28, y: 0.586, rot: 180 }, { x: 0.72, y: 0.586, rot: 180 },
+    { x: 0.5, y: 0.728, rot: 180 },
+    { x: 0.28, y: 0.87, rot: 180 }, { x: 0.72, y: 0.87, rot: 180 },
   ],
 };
 
@@ -88,16 +95,16 @@ export function PlayingCard({ card, className, dimmed }: { card: Card; className
       <rect x="2" y="2" width="236" height="332" rx="16" fill="#fbfaf5" stroke="#cfcabb" strokeWidth="2" />
 
       <g fill={color} fontFamily="Inter, sans-serif">
-        <text x="16" y="42" fontSize="30" fontWeight="800">{label}</text>
-        <text x="20" y="70" fontSize="24">{suitSymbol}</text>
+        <text x="14" y="62" fontSize="60" fontWeight="800">{label}</text>
+        <text x="16" y="108" fontSize="48">{suitSymbol}</text>
       </g>
       <g fill={color} fontFamily="Inter, sans-serif" transform="rotate(180 120 168)">
-        <text x="16" y="42" fontSize="30" fontWeight="800">{label}</text>
-        <text x="20" y="70" fontSize="24">{suitSymbol}</text>
+        <text x="14" y="62" fontSize="60" fontWeight="800">{label}</text>
+        <text x="16" y="108" fontSize="48">{suitSymbol}</text>
       </g>
 
       {card.rank === 14 && (
-        <text x="120" y="205" textAnchor="middle" fontSize="120" fill={color}>{suitSymbol}</text>
+        <text x="120" y="240" textAnchor="middle" fontSize="240" fill={color}>{suitSymbol}</text>
       )}
 
       {face && (
@@ -115,7 +122,7 @@ export function PlayingCard({ card, className, dimmed }: { card: Card; className
           y={p.y * 336}
           textAnchor="middle"
           dominantBaseline="middle"
-          fontSize="34"
+          fontSize="68"
           fill={color}
           transform={p.rot ? `rotate(${p.rot} ${p.x * 240} ${p.y * 336})` : undefined}
         >

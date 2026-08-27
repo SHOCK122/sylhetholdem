@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { SOCKET_EVENTS } from '@sylhet/shared';
 import { emitWithAck, getSocket } from '../socket';
 import { loadTableAuth } from '../storage';
 import { useRoomSocket } from '../hooks/useRoomSocket';
+import { useClickOutside } from '../hooks/useClickOutside';
 import { TableSeat } from '../components/TableSeat';
 import { CommunityBoard } from '../components/CommunityBoard';
 import { PotBoard } from '../components/PotBoard';
@@ -32,6 +33,13 @@ export default function TableScreen() {
   const [connectError, setConnectError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showQr, setShowQr] = useState(true);
+  const qrButtonRef = useRef<HTMLButtonElement>(null);
+  const qrPanelRef = useRef<HTMLDivElement>(null);
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const settingsPanelRef = useRef<HTMLDivElement>(null);
+
+  useClickOutside([qrButtonRef, qrPanelRef], () => setShowQr(false), showQr);
+  useClickOutside([settingsButtonRef, settingsPanelRef], () => setShowSettings(false), showSettings);
 
   useEffect(() => {
     if (!roomCode) return;
@@ -84,7 +92,7 @@ export default function TableScreen() {
           Room <strong>{view.roomCode}</strong>
         </div>
         <div className="table-topbar-actions">
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowQr((v) => !v)}>
+          <button ref={qrButtonRef} className="btn btn-ghost btn-sm" onClick={() => setShowQr((v) => !v)}>
             {showQr ? 'Hide QR' : 'Show QR'}
           </button>
           <button
@@ -94,16 +102,20 @@ export default function TableScreen() {
           >
             Rearrange Seating
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowSettings((v) => !v)}>
+          <button ref={settingsButtonRef} className="btn btn-ghost btn-sm" onClick={() => setShowSettings((v) => !v)}>
             Settings
           </button>
         </div>
       </div>
 
-      {showQr && <RoomQrPanel roomCode={view.roomCode} joinUrl={joinUrl} />}
+      {showQr && (
+        <div ref={qrPanelRef}>
+          <RoomQrPanel roomCode={view.roomCode} joinUrl={joinUrl} />
+        </div>
+      )}
 
       {showSettings && (
-        <div className="table-settings-panel">
+        <div ref={settingsPanelRef} className="table-settings-panel">
           <FeltColorPicker feltColor={feltColor} />
           <BlindsForm smallBlind={view.settings.smallBlind} bigBlind={view.settings.bigBlind} />
         </div>

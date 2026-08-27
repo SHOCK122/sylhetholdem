@@ -10,7 +10,7 @@ export function BlindsForm({ smallBlind, bigBlind }: { smallBlind: number; bigBl
   return (
     <div className="table-settings-blinds">
       <div className="table-settings-title">Blinds</div>
-      <div className="row" style={{ gap: '0.5rem' }}>
+      <div className="row" style={{ gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
         <input type="number" min={1} value={sb} onChange={(e) => setSb(Number(e.target.value) || 0)} />
         <span>/</span>
         <input type="number" min={2} value={bb} onChange={(e) => setBb(Number(e.target.value) || 0)} />

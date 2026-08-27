@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DEFAULT_TURN_MS, PlayerAction, QUICK_CHECK_FOLD_MS, SOCKET_EVENTS } from '@sylhet/shared';
 import { emitWithAck, getSocket } from '../socket';
 import { loadPlayerAuth } from '../storage';
 import { useRoomSocket } from '../hooks/useRoomSocket';
+import { useClickOutside } from '../hooks/useClickOutside';
 import { HoleCards } from '../components/HoleCards';
 import { ChipStack } from '../components/ChipStack';
 import { CommunityBoard } from '../components/CommunityBoard';
@@ -25,6 +26,13 @@ export default function PlayerScreen() {
   const [showTableControls, setShowTableControls] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const auth = useMemo(() => (roomCode ? loadPlayerAuth(roomCode) : null), [roomCode]);
+  const qrButtonRef = useRef<HTMLButtonElement>(null);
+  const qrPanelRef = useRef<HTMLDivElement>(null);
+  const tableControlsButtonRef = useRef<HTMLButtonElement>(null);
+  const tableControlsPanelRef = useRef<HTMLDivElement>(null);
+
+  useClickOutside([qrButtonRef, qrPanelRef], () => setShowQr(false), showQr);
+  useClickOutside([tableControlsButtonRef, tableControlsPanelRef], () => setShowTableControls(false), showTableControls);
 
   useEffect(() => {
     // consume chip fx quietly on player screens (kept simple, no flight animation surface here)
@@ -98,7 +106,7 @@ export default function PlayerScreen() {
 
       {!view.hasTable && (
         <div className="player-tableless-bar">
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowQr((v) => !v)}>
+          <button ref={qrButtonRef} className="btn btn-ghost btn-sm" onClick={() => setShowQr((v) => !v)}>
             {showQr ? 'Hide QR' : 'Invite Players'}
           </button>
           <button
@@ -108,16 +116,20 @@ export default function PlayerScreen() {
           >
             Rearrange Seating
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowTableControls((v) => !v)}>
+          <button ref={tableControlsButtonRef} className="btn btn-ghost btn-sm" onClick={() => setShowTableControls((v) => !v)}>
             Table Settings
           </button>
         </div>
       )}
 
-      {showQr && <RoomQrPanel roomCode={view.roomCode} joinUrl={joinUrl} size={144} />}
+      {showQr && (
+        <div ref={qrPanelRef}>
+          <RoomQrPanel roomCode={view.roomCode} joinUrl={joinUrl} size={144} />
+        </div>
+      )}
 
       {showTableControls && (
-        <div className="table-settings-panel">
+        <div ref={tableControlsPanelRef} className="table-settings-panel">
           <FeltColorPicker feltColor={feltColor} />
           <BlindsForm smallBlind={view.settings.smallBlind} bigBlind={view.settings.bigBlind} />
         </div>
