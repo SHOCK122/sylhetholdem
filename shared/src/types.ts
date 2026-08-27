@@ -65,18 +65,25 @@ export interface PlayerState {
   autoCheckFold: boolean;
 }
 
-// How long a player normally has to act before being auto-resolved, how
-// short that clock becomes when autoCheckFold is enabled, and how much
-// tapping the timer adds.
-export const DEFAULT_TURN_MS = 30_000;
+// How long a player normally has to act before being auto-resolved (the
+// default for new rooms - each room's actual duration lives in its
+// GameSettings.turnDurationMs and is adjustable), how short that clock
+// becomes when autoCheckFold is enabled (fixed, not adjustable), how much
+// tapping the timer adds, and the default delay before the next hand deals
+// itself automatically.
+export const DEFAULT_TURN_MS = 20_000;
 export const QUICK_CHECK_FOLD_MS = 5_000;
 export const EXTEND_TURN_MS = 10_000;
+export const DEFAULT_AUTO_DEAL_MS = 15_000;
 
 export interface GameSettings {
   smallBlind: number;
   bigBlind: number;
   startingChips: number;
   tableColor: string;
+  // Per-room, adjustable via TABLE_SET_TIMING.
+  turnDurationMs: number;
+  autoDealDelayMs: number;
 }
 
 export interface RoomStateSnapshot {
@@ -95,6 +102,7 @@ export interface RoomStateSnapshot {
   bigBlindSeat: number | null;
   currentTurnPlayerId: string | null;
   turnDeadlineAt: number | null;
+  autoDealDeadlineAt: number | null;
   currentBetLevel: number;
   minRaise: number;
   seatingRearrangeActive: boolean;

@@ -1,6 +1,5 @@
 import {
   Card,
-  DEFAULT_TURN_MS,
   EXTEND_TURN_MS,
   GamePhase,
   GameSettings,
@@ -62,6 +61,7 @@ export class PokerRoom {
   bigBlindSeat: number | null = null;
   currentTurnPlayerId: string | null = null;
   turnDeadlineAt: number | null = null;
+  autoDealDeadlineAt: number | null = null;
   currentBetLevel = 0;
   minRaise = 0;
   lastAggressorId: string | null = null;
@@ -91,6 +91,7 @@ export class PokerRoom {
     }
     this.players.set(id, player);
     this.seatOrder.push(id);
+    this.maybeScheduleAutoDeal(); // a new player may push an idle room back over the 2-player minimum
     return player;
   }
 
@@ -110,6 +111,7 @@ export class PokerRoom {
       }
       this.checkRoundOrHandProgress();
     }
+    this.maybeScheduleAutoDeal();
   }
 
   setConnected(id: string, connected: boolean): void {
@@ -171,6 +173,49 @@ export class PokerRoom {
     this.settings.bigBlind = bigBlind;
   }
 
+  // Adjusts the per-player turn clock and/or the delay before the next hand
+  // auto-deals. Either may be omitted to leave it unchanged. A turn-duration
+  // change only takes effect on the next turn it's computed for; an
+  // auto-deal-delay change takes effect immediately if a deal is currently
+  // pending (see maybeScheduleAutoDeal).
+  setTiming(turnDurationMs?: number, autoDealDelayMs?: number): void {
+    if (turnDurationMs !== undefined) {
+      if (!Number.isFinite(turnDurationMs) || turnDurationMs < 5_000 || turnDurationMs > 120_000) {
+        throw new PokerRuleError('Turn timer must be between 5 and 120 seconds');
+      }
+      this.settings.turnDurationMs = turnDurationMs;
+    }
+    if (autoDealDelayMs !== undefined) {
+      if (!Number.isFinite(autoDealDelayMs) || autoDealDelayMs < 3_000 || autoDealDelayMs > 60_000) {
+        throw new PokerRuleError('Auto-deal delay must be between 3 and 60 seconds');
+      }
+      this.settings.autoDealDelayMs = autoDealDelayMs;
+    }
+    this.maybeScheduleAutoDeal();
+  }
+
+  // Arms (or disarms) the auto-deal countdown based on current state. Called
+  // whenever something could change whether a deal should be pending: a hand
+  // ending, seating rearrange starting/finishing, or the delay setting itself
+  // changing.
+  private maybeScheduleAutoDeal(): void {
+    if (!this.seatingRearrangeActive && (this.phase === 'hand-complete' || this.phase === 'showdown') && this.canStartHand()) {
+      this.autoDealDeadlineAt = Date.now() + this.settings.autoDealDelayMs;
+    } else {
+      this.autoDealDeadlineAt = null;
+    }
+  }
+
+  // Called by the server once autoDealDeadlineAt has passed. Re-validates
+  // everything since time may have moved the room on (someone dealt manually,
+  // started a seating rearrange, etc).
+  resolveAutoDeal(): void {
+    if (this.phase !== 'hand-complete' && this.phase !== 'showdown') return;
+    if (this.seatingRearrangeActive) return;
+    if (!this.canStartHand()) return;
+    this.startHand();
+  }
+
   // ---------- Seating rearrangement ----------
 
   startSeatingRearrange(): void {
@@ -179,6 +224,7 @@ export class PokerRoom {
     }
     this.seatingRearrangeActive = true;
     this.seatingTapOrder = [];
+    this.maybeScheduleAutoDeal(); // pauses the countdown while rearranging
   }
 
   tapSeatingOrder(playerId: string): void {
@@ -194,12 +240,14 @@ export class PokerRoom {
       });
       this.seatingRearrangeActive = false;
       this.seatingTapOrder = [];
+      this.maybeScheduleAutoDeal(); // resumes the countdown, fresh
     }
   }
 
   cancelSeatingRearrange(): void {
     this.seatingRearrangeActive = false;
     this.seatingTapOrder = [];
+    this.maybeScheduleAutoDeal();
   }
 
   // ---------- Hand lifecycle ----------
@@ -221,6 +269,8 @@ export class PokerRoom {
     if (this.phase !== 'lobby' && this.phase !== 'hand-complete' && this.phase !== 'showdown') {
       throw new PokerRuleError('A hand is already in progress');
     }
+
+    this.autoDealDeadlineAt = null;
 
     const eligible = this.eligibleForHand();
     for (const p of this.players.values()) {
@@ -296,7 +346,7 @@ export class PokerRoom {
       return;
     }
     const player = this.players.get(playerId);
-    const duration = player?.autoCheckFold ? QUICK_CHECK_FOLD_MS : DEFAULT_TURN_MS;
+    const duration = player?.autoCheckFold ? QUICK_CHECK_FOLD_MS : this.settings.turnDurationMs;
     this.turnDeadlineAt = Date.now() + duration;
   }
 
@@ -569,6 +619,7 @@ export class PokerRoom {
     }
     this.phase = 'hand-complete';
     this.setCurrentTurn(null);
+    this.maybeScheduleAutoDeal();
   }
 
   private goToShowdown(): void {
@@ -632,6 +683,7 @@ export class PokerRoom {
     this.potResults = results;
     this.phase = 'showdown';
     this.setCurrentTurn(null);
+    this.maybeScheduleAutoDeal();
   }
 
   // ---------- Snapshot ----------
@@ -681,6 +733,7 @@ export class PokerRoom {
       bigBlindSeat: this.bigBlindSeat,
       currentTurnPlayerId: this.currentTurnPlayerId,
       turnDeadlineAt: this.turnDeadlineAt,
+      autoDealDeadlineAt: this.autoDealDeadlineAt,
       currentBetLevel: this.currentBetLevel,
       minRaise: this.minRaise,
       seatingRearrangeActive: this.seatingRearrangeActive,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { DEFAULT_TURN_MS, PlayerAction, QUICK_CHECK_FOLD_MS, SOCKET_EVENTS } from '@sylhet/shared';
+import { PlayerAction, QUICK_CHECK_FOLD_MS, SOCKET_EVENTS } from '@sylhet/shared';
 import { emitWithAck, getSocket } from '../socket';
 import { loadPlayerAuth } from '../storage';
 import { useRoomSocket } from '../hooks/useRoomSocket';
@@ -13,6 +13,8 @@ import { TurnTimer } from '../components/TurnTimer';
 import { RoomQrPanel } from '../components/RoomQrPanel';
 import { FeltColorPicker } from '../components/FeltColorPicker';
 import { BlindsForm } from '../components/BlindsForm';
+import { TimingForm } from '../components/TimingForm';
+import { AutoDealCountdown } from '../components/AutoDealCountdown';
 import { darken } from '../colorUtils';
 import './PlayerScreen.css';
 import '../pages/TableScreen.css';
@@ -132,6 +134,7 @@ export default function PlayerScreen() {
         <div ref={tableControlsPanelRef} className="table-settings-panel">
           <FeltColorPicker feltColor={feltColor} />
           <BlindsForm smallBlind={view.settings.smallBlind} bigBlind={view.settings.bigBlind} />
+          <TimingForm turnDurationMs={view.settings.turnDurationMs} autoDealDelayMs={view.settings.autoDealDelayMs} />
         </div>
       )}
 
@@ -145,7 +148,7 @@ export default function PlayerScreen() {
             {p.allIn && !p.folded && <div className="opponent-tag opponent-tag-allin">all-in</div>}
             {p.isTurn && (
               <div className="opponent-timer">
-                <TurnTimer deadlineAt={view.turnDeadlineAt} totalMs={p.autoCheckFold ? QUICK_CHECK_FOLD_MS : DEFAULT_TURN_MS} />
+                <TurnTimer deadlineAt={view.turnDeadlineAt} totalMs={p.autoCheckFold ? QUICK_CHECK_FOLD_MS : view.settings.turnDurationMs} />
               </div>
             )}
           </div>
@@ -202,7 +205,7 @@ export default function PlayerScreen() {
         <div className="player-turn-timer">
           <TurnTimer
             deadlineAt={view.turnDeadlineAt}
-            totalMs={me?.autoCheckFold ? QUICK_CHECK_FOLD_MS : DEFAULT_TURN_MS}
+            totalMs={me?.autoCheckFold ? QUICK_CHECK_FOLD_MS : view.settings.turnDurationMs}
             interactive
             onExtend={() => emitWithAck(SOCKET_EVENTS.PLAYER_EXTEND_TIMER).catch(() => {})}
           />
@@ -265,11 +268,18 @@ export default function PlayerScreen() {
           {view.players.length < 2 ? (
             <div className="table-waiting">Waiting for at least 2 players to join…</div>
           ) : view.canStartHand ? (
-            <button className="btn btn-primary btn-big" onClick={() => emitWithAck(SOCKET_EVENTS.TABLE_START_HAND).catch(() => {})}>
-              {view.handNumber === 0 ? 'Deal First Hand' : 'Deal Next Hand'}
-            </button>
+            <div className="table-deal-stack">
+              <button className="btn btn-primary btn-big" onClick={() => emitWithAck(SOCKET_EVENTS.TABLE_START_HAND).catch(() => {})}>
+                {view.handNumber === 0 ? 'Deal First Hand' : 'Deal Next Hand'}
+              </button>
+              <AutoDealCountdown deadlineAt={view.autoDealDeadlineAt} />
+            </div>
           ) : null}
         </div>
+      )}
+
+      {view.hasTable && (
+        <AutoDealCountdown deadlineAt={view.autoDealDeadlineAt} />
       )}
 
       {showSeatingOverlay && (

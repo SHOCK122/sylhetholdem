@@ -44,6 +44,7 @@ export interface RoomView {
   bigBlindSeat: number | null;
   currentTurnPlayerId: string | null;
   turnDeadlineAt: number | null;
+  autoDealDeadlineAt: number | null;
   currentBetLevel: number;
   minRaise: number;
   seatingRearrangeActive: boolean;
@@ -117,6 +118,11 @@ export interface SetAutoCheckFoldPayload {
   enabled: boolean;
 }
 
+export interface SetTimingPayload {
+  turnDurationMs?: number;
+  autoDealDelayMs?: number;
+}
+
 export interface ErrorPayload {
   message: string;
 }
@@ -138,6 +144,7 @@ export const SOCKET_EVENTS = {
   TABLE_RECONNECT: 'table:reconnect',
   TABLE_SET_COLOR: 'table:setColor',
   TABLE_SET_BLINDS: 'table:setBlinds',
+  TABLE_SET_TIMING: 'table:setTiming',
   TABLE_START_HAND: 'table:startHand',
   TABLE_REARRANGE_START: 'table:rearrangeStart',
   TABLE_REARRANGE_CANCEL: 'table:rearrangeCancel',

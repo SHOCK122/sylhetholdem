@@ -12,6 +12,8 @@ import { ChipFxLayer } from '../components/ChipFxLayer';
 import { RoomQrPanel } from '../components/RoomQrPanel';
 import { FeltColorPicker } from '../components/FeltColorPicker';
 import { BlindsForm } from '../components/BlindsForm';
+import { TimingForm } from '../components/TimingForm';
+import { AutoDealCountdown } from '../components/AutoDealCountdown';
 import { darken } from '../colorUtils';
 import './TableScreen.css';
 
@@ -118,6 +120,7 @@ export default function TableScreen() {
         <div ref={settingsPanelRef} className="table-settings-panel">
           <FeltColorPicker feltColor={feltColor} />
           <BlindsForm smallBlind={view.settings.smallBlind} bigBlind={view.settings.bigBlind} />
+          <TimingForm turnDurationMs={view.settings.turnDurationMs} autoDealDelayMs={view.settings.autoDealDelayMs} />
         </div>
       )}
 
@@ -129,6 +132,7 @@ export default function TableScreen() {
               player={p}
               style={{ left: `${positions[p.seat]?.x ?? 50}%`, top: `${positions[p.seat]?.y ?? 50}%` }}
               deadlineAt={p.isTurn ? view.turnDeadlineAt : null}
+              turnDurationMs={view.settings.turnDurationMs}
               rearrangeTapIndex={
                 view.seatingRearrangeActive ? (() => {
                   const idx = view.seatingTapOrder.indexOf(p.id);
@@ -160,9 +164,12 @@ export default function TableScreen() {
         {view.players.length < 2 ? (
           <div className="table-waiting">Waiting for at least 2 players to join…</div>
         ) : view.canStartHand ? (
-          <button className="btn btn-primary btn-big" onClick={() => emitWithAck(SOCKET_EVENTS.TABLE_START_HAND).catch(() => {})}>
-            {view.handNumber === 0 ? 'Deal First Hand' : 'Deal Next Hand'}
-          </button>
+          <div className="table-deal-stack">
+            <button className="btn btn-primary btn-big" onClick={() => emitWithAck(SOCKET_EVENTS.TABLE_START_HAND).catch(() => {})}>
+              {view.handNumber === 0 ? 'Deal First Hand' : 'Deal Next Hand'}
+            </button>
+            <AutoDealCountdown deadlineAt={view.autoDealDeadlineAt} />
+          </div>
         ) : (
           <div className="table-hand-status">
             Hand #{view.handNumber} — {view.phase.toUpperCase()}
