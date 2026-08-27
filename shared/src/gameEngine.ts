@@ -1,4 +1,15 @@
-import { Card, GamePhase, GameSettings, PlayerAction, PlayerState, Pot, PotResult, RoomStateSnapshot } from './types';
+import {
+  Card,
+  DEFAULT_TURN_MS,
+  EXTEND_TURN_MS,
+  GamePhase,
+  GameSettings,
+  PlayerAction,
+  PlayerState,
+  Pot,
+  PotResult,
+  RoomStateSnapshot,
+} from './types';
 import { createDeck, shuffleDeck } from './cards';
 import { compareHandScore, evaluateBestHand } from './handEvaluator';
 import { computePots, computeUncalledReturn, Contribution } from './potManager';
@@ -27,6 +38,7 @@ function makePlayer(id: string, name: string, seat: number, chips: number): Play
     hasActedThisStreet: false,
     lastAction: null,
     revealedAtShowdown: false,
+    autoCallFold: false,
   };
 }
 
@@ -48,6 +60,7 @@ export class PokerRoom {
   smallBlindSeat: number | null = null;
   bigBlindSeat: number | null = null;
   currentTurnPlayerId: string | null = null;
+  turnDeadlineAt: number | null = null;
   currentBetLevel = 0;
   minRaise = 0;
   lastAggressorId: string | null = null;
@@ -101,6 +114,50 @@ export class PokerRoom {
   setConnected(id: string, connected: boolean): void {
     const p = this.players.get(id);
     if (p) p.connected = connected;
+  }
+
+  setAutoCallFold(id: string, enabled: boolean): void {
+    const p = this.players.get(id);
+    if (p) p.autoCallFold = enabled;
+  }
+
+  // A disconnected player can never be relied on to act, so they immediately
+  // fold out of whatever hand is in progress - regardless of whose turn it
+  // actually is right now. Safe to call any time (no-op outside a live hand,
+  // or if the player is already folded/all-in/not in this hand).
+  forceFoldPlayer(id: string): void {
+    if (this.phase === 'lobby' || this.phase === 'hand-complete' || this.phase === 'showdown') return;
+    if (!this.handPlayerIds.includes(id)) return;
+    const player = this.players.get(id);
+    if (!player || player.folded || player.allIn) return;
+    player.folded = true;
+    player.lastAction = { type: 'fold' };
+    this.checkRoundOrHandProgress();
+  }
+
+  // Only valid while it's genuinely this player's turn; tapping the timer
+  // pushes their deadline back by EXTEND_TURN_MS.
+  extendTurnTimer(id: string): void {
+    if (this.currentTurnPlayerId !== id || this.turnDeadlineAt === null) return;
+    this.turnDeadlineAt += EXTEND_TURN_MS;
+  }
+
+  // Called by the server once a player's turnDeadlineAt has passed. Checking
+  // is always free, so timing out only ever risks a fold when there's an
+  // actual bet to respond to - and even then only if the player hasn't opted
+  // into auto-call via autoCallFold.
+  resolveTurnTimeout(id: string): void {
+    if (this.currentTurnPlayerId !== id) return;
+    const player = this.players.get(id);
+    if (!player) return;
+    const toCall = this.currentBetLevel - player.currentStreetBet;
+    if (toCall <= 0) {
+      this.applyAction(id, { type: 'check' });
+    } else if (player.autoCallFold) {
+      this.applyAction(id, { type: 'call' });
+    } else {
+      this.applyAction(id, { type: 'fold' });
+    }
   }
 
   setTableColor(color: string): void {
@@ -227,10 +284,15 @@ export class PokerRoom {
     this.phase = 'preflop';
 
     const firstToAct = n === 2 ? sbIdx : (bbIdx + 1) % n;
-    this.currentTurnPlayerId = this.findNextToAct(firstToAct, true);
+    this.setCurrentTurn(this.findNextToAct(firstToAct, true));
     if (!this.currentTurnPlayerId) {
       this.checkRoundOrHandProgress();
     }
+  }
+
+  private setCurrentTurn(playerId: string | null): void {
+    this.currentTurnPlayerId = playerId;
+    this.turnDeadlineAt = playerId ? Date.now() + DEFAULT_TURN_MS : null;
   }
 
   private postBlind(playerId: string, amount: number): void {
@@ -397,11 +459,27 @@ export class PokerRoom {
       canAct.every((p) => p.hasActedThisStreet && p.currentStreetBet === this.currentBetLevel);
 
     if (!roundDone) {
+      // Figure out who should act next. Normally this method runs right after
+      // the current turn-holder has just acted, so we advance past them. But
+      // it can also run for an unrelated reason (e.g. force-folding a
+      // disconnected bystander) - in that case the real current actor still
+      // owes their action and the turn must NOT move.
+      const current = this.currentTurnPlayerId ? this.players.get(this.currentTurnPlayerId) : null;
+      const currentStillOwesAction =
+        !!current &&
+        !current.folded &&
+        !current.allIn &&
+        !(current.hasActedThisStreet && current.currentStreetBet === this.currentBetLevel);
+
+      if (currentStillOwesAction) {
+        return;
+      }
+
       const currentIdx = this.currentTurnPlayerId
         ? this.handPlayerIds.indexOf(this.currentTurnPlayerId)
         : 0;
       const next = this.findNextToAct(currentIdx, false);
-      this.currentTurnPlayerId = next;
+      this.setCurrentTurn(next);
       if (!next) {
         // nobody left who can act (shouldn't normally happen given roundDone check)
         this.advancePhaseAfterBetting();
@@ -450,7 +528,7 @@ export class PokerRoom {
     const dealerIdx = this.handPlayerIds.findIndex(
       (id) => this.players.get(id)!.seat === this.dealerSeat
     );
-    this.currentTurnPlayerId = this.findNextToAct(dealerIdx, false);
+    this.setCurrentTurn(this.findNextToAct(dealerIdx, false));
     if (!this.currentTurnPlayerId) {
       this.advancePhaseAfterBetting();
     }
@@ -485,7 +563,7 @@ export class PokerRoom {
       this.potResults = [];
     }
     this.phase = 'hand-complete';
-    this.currentTurnPlayerId = null;
+    this.setCurrentTurn(null);
   }
 
   private goToShowdown(): void {
@@ -548,7 +626,7 @@ export class PokerRoom {
 
     this.potResults = results;
     this.phase = 'showdown';
-    this.currentTurnPlayerId = null;
+    this.setCurrentTurn(null);
   }
 
   // ---------- Snapshot ----------
@@ -597,6 +675,7 @@ export class PokerRoom {
       smallBlindSeat: this.smallBlindSeat,
       bigBlindSeat: this.bigBlindSeat,
       currentTurnPlayerId: this.currentTurnPlayerId,
+      turnDeadlineAt: this.turnDeadlineAt,
       currentBetLevel: this.currentBetLevel,
       minRaise: this.minRaise,
       seatingRearrangeActive: this.seatingRearrangeActive,

@@ -1,15 +1,16 @@
 import { Server, Socket } from 'socket.io';
 import {
   ActionPayload,
+  CreatePlayerRoomPayload,
   CreateTablePayload,
   CreateTableResult,
   ErrorPayload,
   JoinPlayerPayload,
   JoinPlayerResult,
-  PokerRoom,
   PokerRuleError,
   ReconnectPlayerPayload,
   ReconnectTablePayload,
+  SetAutoCallFoldPayload,
   SetBlindsPayload,
   SetColorPayload,
   SOCKET_EVENTS,
@@ -33,19 +34,58 @@ function fail(cb: ((res: { ok: false; message: string }) => void) | undefined, m
   if (cb) cb({ ok: false, message });
 }
 
+function joinPlayerToRoom(
+  socket: Socket<any, any, any, SocketData>,
+  entry: RoomEntry,
+  playerId: string
+) {
+  socket.data.role = 'player';
+  socket.data.roomCode = entry.room.roomCode;
+  socket.data.playerId = playerId;
+  socket.join(entry.room.roomCode);
+  if (!playerSockets.has(entry.room.roomCode)) playerSockets.set(entry.room.roomCode, new Map());
+  playerSockets.get(entry.room.roomCode)!.set(playerId, socket.id);
+}
+
 export function registerSocketHandlers(io: Server) {
+  const turnTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+  function scheduleTurnTimer(roomCode: string) {
+    const existing = turnTimers.get(roomCode);
+    if (existing) clearTimeout(existing);
+    turnTimers.delete(roomCode);
+
+    const entry = getRoom(roomCode);
+    if (!entry) return;
+    const { currentTurnPlayerId, turnDeadlineAt } = entry.room;
+    if (!currentTurnPlayerId || turnDeadlineAt === null) return;
+
+    const delay = Math.max(0, turnDeadlineAt - Date.now());
+    const handle = setTimeout(() => {
+      turnTimers.delete(roomCode);
+      const liveEntry = getRoom(roomCode);
+      if (!liveEntry) return;
+      // Defensive re-check: state may have moved on between scheduling and firing.
+      if (liveEntry.room.currentTurnPlayerId !== currentTurnPlayerId) return;
+      runMutation(roomCode, liveEntry, () => liveEntry.room.resolveTurnTimeout(currentTurnPlayerId));
+    }, delay);
+    turnTimers.set(roomCode, handle);
+  }
+
   function broadcastRoom(roomCode: string) {
     const entry = getRoom(roomCode);
     if (!entry) return;
+    const hasTable = entry.tableSocketId !== null;
     if (entry.tableSocketId) {
-      io.to(entry.tableSocketId).emit(SOCKET_EVENTS.ROOM_VIEW, buildRoomView(entry.room, 'table'));
+      io.to(entry.tableSocketId).emit(SOCKET_EVENTS.ROOM_VIEW, buildRoomView(entry.room, 'table', undefined, hasTable));
     }
     const sockets = playerSockets.get(roomCode);
     if (sockets) {
       for (const [playerId, socketId] of sockets) {
-        io.to(socketId).emit(SOCKET_EVENTS.ROOM_VIEW, buildRoomView(entry.room, 'player', playerId));
+        io.to(socketId).emit(SOCKET_EVENTS.ROOM_VIEW, buildRoomView(entry.room, 'player', playerId, hasTable));
       }
     }
+    scheduleTurnTimer(roomCode);
   }
 
   function runMutation(roomCode: string, entry: RoomEntry, mutate: () => void, socket?: Socket) {
@@ -114,12 +154,29 @@ export function registerSocketHandlers(io: Server) {
       const playerToken = generateToken();
       entry.room.addPlayer(playerId, name);
       entry.playerAuth.set(playerId, playerToken);
-      socket.data.role = 'player';
-      socket.data.roomCode = entry.room.roomCode;
-      socket.data.playerId = playerId;
-      socket.join(entry.room.roomCode);
-      if (!playerSockets.has(entry.room.roomCode)) playerSockets.set(entry.room.roomCode, new Map());
-      playerSockets.get(entry.room.roomCode)!.set(playerId, socket.id);
+      joinPlayerToRoom(socket, entry, playerId);
+      ok<JoinPlayerResult>(cb, { playerId, playerToken, roomCode: entry.room.roomCode });
+      broadcastRoom(entry.room.roomCode);
+    });
+
+    // Lets a group play with no "table" spectator at all: the creator becomes
+    // an ordinary player in a brand new room, and (since the room then has no
+    // table connected) gains the ability to start hands / rearrange seating /
+    // tweak settings themselves - see requireController below.
+    socket.on(SOCKET_EVENTS.PLAYER_CREATE_ROOM, (payload: CreatePlayerRoomPayload, cb?: (res: any) => void) => {
+      const name = (payload?.name || '').trim().slice(0, 24);
+      if (!name) return fail(cb, 'Name is required');
+      const entry = createRoom({
+        smallBlind: payload.smallBlind,
+        bigBlind: payload.bigBlind,
+        startingChips: payload.startingChips,
+        tableColor: payload.tableColor,
+      });
+      const playerId = generatePlayerId();
+      const playerToken = generateToken();
+      entry.room.addPlayer(playerId, name);
+      entry.playerAuth.set(playerId, playerToken);
+      joinPlayerToRoom(socket, entry, playerId);
       ok<JoinPlayerResult>(cb, { playerId, playerToken, roomCode: entry.room.roomCode });
       broadcastRoom(entry.room.roomCode);
     });
@@ -131,42 +188,37 @@ export function registerSocketHandlers(io: Server) {
       if (!expectedToken || expectedToken !== payload.playerToken) return fail(cb, 'Invalid reconnect token');
       if (!entry.room.players.has(payload.playerId)) return fail(cb, 'Player no longer in room');
       entry.room.setConnected(payload.playerId, true);
-      socket.data.role = 'player';
-      socket.data.roomCode = entry.room.roomCode;
-      socket.data.playerId = payload.playerId;
-      socket.join(entry.room.roomCode);
-      if (!playerSockets.has(entry.room.roomCode)) playerSockets.set(entry.room.roomCode, new Map());
-      playerSockets.get(entry.room.roomCode)!.set(payload.playerId, socket.id);
+      joinPlayerToRoom(socket, entry, payload.playerId);
       ok(cb, {});
       broadcastRoom(entry.room.roomCode);
     });
 
     socket.on(SOCKET_EVENTS.TABLE_SET_COLOR, (payload: SetColorPayload) => {
-      requireTable(socket, (roomCode, entry) => {
+      requireController(socket, (roomCode, entry) => {
         runMutation(roomCode, entry, () => entry.room.setTableColor(payload.color));
       });
     });
 
     socket.on(SOCKET_EVENTS.TABLE_SET_BLINDS, (payload: SetBlindsPayload) => {
-      requireTable(socket, (roomCode, entry) => {
+      requireController(socket, (roomCode, entry) => {
         runMutation(roomCode, entry, () => entry.room.setBlinds(payload.smallBlind, payload.bigBlind), socket);
       });
     });
 
     socket.on(SOCKET_EVENTS.TABLE_START_HAND, () => {
-      requireTable(socket, (roomCode, entry) => {
+      requireController(socket, (roomCode, entry) => {
         runMutation(roomCode, entry, () => entry.room.startHand(), socket);
       });
     });
 
     socket.on(SOCKET_EVENTS.TABLE_REARRANGE_START, () => {
-      requireTable(socket, (roomCode, entry) => {
+      requireController(socket, (roomCode, entry) => {
         runMutation(roomCode, entry, () => entry.room.startSeatingRearrange(), socket);
       });
     });
 
     socket.on(SOCKET_EVENTS.TABLE_REARRANGE_CANCEL, () => {
-      requireTable(socket, (roomCode, entry) => {
+      requireController(socket, (roomCode, entry) => {
         runMutation(roomCode, entry, () => entry.room.cancelSeatingRearrange());
       });
     });
@@ -183,6 +235,18 @@ export function registerSocketHandlers(io: Server) {
       });
     });
 
+    socket.on(SOCKET_EVENTS.PLAYER_EXTEND_TIMER, () => {
+      requirePlayer(socket, (roomCode, entry, playerId) => {
+        runMutation(roomCode, entry, () => entry.room.extendTurnTimer(playerId));
+      });
+    });
+
+    socket.on(SOCKET_EVENTS.PLAYER_SET_AUTO_CALL_FOLD, (payload: SetAutoCallFoldPayload) => {
+      requirePlayer(socket, (roomCode, entry, playerId) => {
+        runMutation(roomCode, entry, () => entry.room.setAutoCallFold(playerId, !!payload?.enabled));
+      });
+    });
+
     socket.on('disconnect', () => {
       const { role, roomCode, playerId } = socket.data;
       if (!roomCode) return;
@@ -190,23 +254,38 @@ export function registerSocketHandlers(io: Server) {
       if (!entry) return;
       if (role === 'table' && entry.tableSocketId === socket.id) {
         entry.tableSocketId = null;
-      } else if (role === 'player' && playerId) {
+      }
+      if (role === 'player' && playerId) {
         const sockets = playerSockets.get(roomCode);
         if (sockets && sockets.get(playerId) === socket.id) {
           sockets.delete(playerId);
           entry.room.setConnected(playerId, false);
+          entry.room.forceFoldPlayer(playerId);
         }
       }
       broadcastRoom(roomCode);
     });
   });
 
-  function requireTable(socket: Socket<any, any, any, SocketData>, fn: (roomCode: string, entry: RoomEntry) => void) {
-    const { role, roomCode } = socket.data;
-    if (role !== 'table' || !roomCode) return;
+  // Table actions (start hand, rearrange seating, blinds, felt color) are
+  // normally reserved for the connected "table" spectator. But a room can
+  // also be played with no table at all - in that case any seated player is
+  // allowed to control it, since there's nobody else who could.
+  function requireController(
+    socket: Socket<any, any, any, SocketData>,
+    fn: (roomCode: string, entry: RoomEntry) => void
+  ) {
+    const { role, roomCode, playerId } = socket.data;
+    if (!roomCode) return;
     const entry = getRoom(roomCode);
-    if (!entry || entry.tableSocketId !== socket.id) return;
-    fn(roomCode, entry);
+    if (!entry) return;
+    if (role === 'table' && entry.tableSocketId === socket.id) {
+      fn(roomCode, entry);
+      return;
+    }
+    if (role === 'player' && playerId && entry.tableSocketId === null && entry.room.players.has(playerId)) {
+      fn(roomCode, entry);
+    }
   }
 
   function requirePlayer(

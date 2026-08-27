@@ -8,8 +8,13 @@ import { HoleCards } from '../components/HoleCards';
 import { ChipStack } from '../components/ChipStack';
 import { CommunityBoard } from '../components/CommunityBoard';
 import { BetSelector } from '../components/BetSelector';
+import { TurnTimer } from '../components/TurnTimer';
+import { RoomQrPanel } from '../components/RoomQrPanel';
+import { FeltColorPicker } from '../components/FeltColorPicker';
+import { BlindsForm } from '../components/BlindsForm';
 import { darken } from '../colorUtils';
 import './PlayerScreen.css';
+import '../pages/TableScreen.css';
 
 export default function PlayerScreen() {
   const { roomCode } = useParams();
@@ -17,6 +22,8 @@ export default function PlayerScreen() {
   const { view, error, setError, chipFx, dismissChipFx, connected } = useRoomSocket();
   const [connectError, setConnectError] = useState<string | null>(null);
   const [showBetSelector, setShowBetSelector] = useState<'bet' | 'raise' | null>(null);
+  const [showTableControls, setShowTableControls] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const auth = useMemo(() => (roomCode ? loadPlayerAuth(roomCode) : null), [roomCode]);
 
   useEffect(() => {
@@ -70,6 +77,7 @@ export default function PlayerScreen() {
   const va = view.myValidActions;
   const isMyTurn = !!me?.isTurn && !!va && va.actions.length > 0;
   const potTotal = view.pots.reduce((s, p) => s + p.amount, 0);
+  const joinUrl = `${window.location.origin}/join/${view.roomCode}`;
 
   function doAction(action: PlayerAction) {
     emitWithAck(SOCKET_EVENTS.PLAYER_ACTION, { action }).catch(() => {});
@@ -88,6 +96,33 @@ export default function PlayerScreen() {
         </span>
       </div>
 
+      {!view.hasTable && (
+        <div className="player-tableless-bar">
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowQr((v) => !v)}>
+            {showQr ? 'Hide QR' : 'Invite Players'}
+          </button>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => emitWithAck(SOCKET_EVENTS.TABLE_REARRANGE_START).catch(() => {})}
+            disabled={view.seatingRearrangeActive}
+          >
+            Rearrange Seating
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowTableControls((v) => !v)}>
+            Table Settings
+          </button>
+        </div>
+      )}
+
+      {showQr && <RoomQrPanel roomCode={view.roomCode} joinUrl={joinUrl} size={144} />}
+
+      {showTableControls && (
+        <div className="table-settings-panel">
+          <FeltColorPicker feltColor={feltColor} />
+          <BlindsForm smallBlind={view.settings.smallBlind} bigBlind={view.settings.bigBlind} />
+        </div>
+      )}
+
       <div className="player-opponents">
         {others.map((p) => (
           <div key={p.id} className={'opponent-chip' + (p.isTurn ? ' opponent-chip-turn' : '') + (p.folded ? ' opponent-chip-folded' : '')}>
@@ -96,6 +131,11 @@ export default function PlayerScreen() {
             {p.currentStreetBet > 0 && <div className="opponent-bet">bet {p.currentStreetBet.toLocaleString()}</div>}
             {p.folded && <div className="opponent-tag">folded</div>}
             {p.allIn && !p.folded && <div className="opponent-tag opponent-tag-allin">all-in</div>}
+            {p.isTurn && (
+              <div className="opponent-timer">
+                <TurnTimer deadlineAt={view.turnDeadlineAt} />
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -134,7 +174,27 @@ export default function PlayerScreen() {
             <span>{me.currentStreetBet.toLocaleString()} in</span>
           </div>
         )}
+        {me && (
+          <label className="auto-call-fold-toggle">
+            <input
+              type="checkbox"
+              checked={me.autoCallFold}
+              onChange={(e) => emitWithAck(SOCKET_EVENTS.PLAYER_SET_AUTO_CALL_FOLD, { enabled: e.target.checked }).catch(() => {})}
+            />
+            Call instead of fold if my time runs out
+          </label>
+        )}
       </div>
+
+      {isMyTurn && (
+        <div className="player-turn-timer">
+          <TurnTimer
+            deadlineAt={view.turnDeadlineAt}
+            interactive
+            onExtend={() => emitWithAck(SOCKET_EVENTS.PLAYER_EXTEND_TIMER).catch(() => {})}
+          />
+        </div>
+      )}
 
       {isMyTurn && !showBetSelector && (
         <div className="player-actions">
@@ -185,6 +245,18 @@ export default function PlayerScreen() {
 
       {!isMyTurn && view.phase !== 'lobby' && view.phase !== 'hand-complete' && view.phase !== 'showdown' && (
         <div className="player-waiting">Waiting for other players…</div>
+      )}
+
+      {!view.hasTable && (view.phase === 'lobby' || view.phase === 'hand-complete' || view.phase === 'showdown') && (
+        <div className="player-tableless-deal">
+          {view.players.length < 2 ? (
+            <div className="table-waiting">Waiting for at least 2 players to join…</div>
+          ) : view.canStartHand ? (
+            <button className="btn btn-primary btn-big" onClick={() => emitWithAck(SOCKET_EVENTS.TABLE_START_HAND).catch(() => {})}>
+              {view.handNumber === 0 ? 'Deal First Hand' : 'Deal Next Hand'}
+            </button>
+          ) : null}
+        </div>
       )}
 
       {showSeatingOverlay && (

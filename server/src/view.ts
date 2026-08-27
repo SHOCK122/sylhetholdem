@@ -3,7 +3,8 @@ import { evaluateBestHand, PokerRoom, PublicPlayerView, RoomView } from '@sylhet
 export function buildRoomView(
   room: PokerRoom,
   viewerType: 'table' | 'player',
-  viewerPlayerId?: string
+  viewerPlayerId: string | undefined,
+  hasTable: boolean
 ): RoomView {
   const snapshot = room.snapshot();
 
@@ -33,6 +34,7 @@ export function buildRoomView(
       holeCards: showCards ? p.holeCards : null,
       lastAction: p.lastAction,
       handDescription,
+      autoCallFold: p.autoCallFold,
     };
   });
 
@@ -50,6 +52,7 @@ export function buildRoomView(
     smallBlindSeat: snapshot.smallBlindSeat,
     bigBlindSeat: snapshot.bigBlindSeat,
     currentTurnPlayerId: snapshot.currentTurnPlayerId,
+    turnDeadlineAt: snapshot.turnDeadlineAt,
     currentBetLevel: snapshot.currentBetLevel,
     minRaise: snapshot.minRaise,
     seatingRearrangeActive: snapshot.seatingRearrangeActive,
@@ -57,6 +60,7 @@ export function buildRoomView(
     viewerType,
     viewerPlayerId,
     canStartHand: room.canStartHand() && (snapshot.phase === 'lobby' || snapshot.phase === 'hand-complete' || snapshot.phase === 'showdown'),
+    hasTable,
   };
 
   if (viewerType === 'player' && viewerPlayerId) {

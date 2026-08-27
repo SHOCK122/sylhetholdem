@@ -109,6 +109,12 @@
   margin-top: 2px;
 }
 
+.table-seat-timer {
+  display: flex;
+  justify-content: center;
+  margin-top: 4px;
+}
+
 .table-seat-tapnum {
   position: absolute;
   top: -10px;

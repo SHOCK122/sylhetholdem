@@ -1,0 +1,76 @@
+.turn-timer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.turn-timer-big {
+  width: 84px;
+  height: 84px;
+}
+
+.turn-timer-small {
+  width: 30px;
+  height: 30px;
+}
+
+.turn-timer-ring {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+}
+
+.turn-timer-track {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.18);
+  stroke-width: 3;
+}
+
+.turn-timer-progress {
+  fill: none;
+  stroke: var(--gold);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.2s linear;
+}
+
+.turn-timer-urgent .turn-timer-progress {
+  stroke: var(--danger);
+}
+
+.turn-timer-seconds {
+  font-weight: 800;
+  color: var(--text);
+}
+
+.turn-timer-big .turn-timer-seconds {
+  font-size: 1.6rem;
+}
+
+.turn-timer-small .turn-timer-seconds {
+  font-size: 0.7rem;
+}
+
+.turn-timer-tap {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.turn-timer-tap:active .turn-timer-big {
+  transform: scale(0.94);
+}
+
+.turn-timer-hint {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-weight: 600;
+}

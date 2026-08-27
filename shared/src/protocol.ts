@@ -19,6 +19,7 @@ export interface PublicPlayerView {
   holeCards: Card[] | null;
   lastAction: PlayerAction | null;
   handDescription?: string;
+  autoCallFold: boolean;
 }
 
 export interface ValidActionsInfo {
@@ -42,6 +43,7 @@ export interface RoomView {
   smallBlindSeat: number | null;
   bigBlindSeat: number | null;
   currentTurnPlayerId: string | null;
+  turnDeadlineAt: number | null;
   currentBetLevel: number;
   minRaise: number;
   seatingRearrangeActive: boolean;
@@ -50,6 +52,10 @@ export interface RoomView {
   viewerPlayerId?: string;
   myValidActions?: ValidActionsInfo;
   canStartHand: boolean;
+  // Whether a "table" spectator is currently connected to this room. When
+  // false, players are allowed to control the room themselves (start hands,
+  // rearrange seating, adjust blinds/color) since there's no one else to.
+  hasTable: boolean;
 }
 
 export interface CreateTablePayload {
@@ -75,6 +81,14 @@ export interface JoinPlayerResult {
   roomCode: string;
 }
 
+export interface CreatePlayerRoomPayload {
+  name: string;
+  smallBlind?: number;
+  bigBlind?: number;
+  startingChips?: number;
+  tableColor?: string;
+}
+
 export interface ReconnectTablePayload {
   roomCode: string;
   tableToken: string;
@@ -97,6 +111,10 @@ export interface SetBlindsPayload {
 
 export interface SetColorPayload {
   color: string;
+}
+
+export interface SetAutoCallFoldPayload {
+  enabled: boolean;
 }
 
 export interface ErrorPayload {
@@ -125,9 +143,12 @@ export const SOCKET_EVENTS = {
   TABLE_REARRANGE_CANCEL: 'table:rearrangeCancel',
 
   PLAYER_JOIN: 'player:join',
+  PLAYER_CREATE_ROOM: 'player:createRoom',
   PLAYER_RECONNECT: 'player:reconnect',
   PLAYER_ACTION: 'player:action',
   PLAYER_SEATING_TAP: 'player:seatingTap',
+  PLAYER_EXTEND_TIMER: 'player:extendTimer',
+  PLAYER_SET_AUTO_CALL_FOLD: 'player:setAutoCallFold',
 
   ROOM_VIEW: 'room:view',
   ROOM_ERROR: 'room:error',

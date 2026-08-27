@@ -59,7 +59,14 @@ export interface PlayerState {
   hasActedThisStreet: boolean;
   lastAction: PlayerAction | null;
   revealedAtShowdown: boolean;
+  // When this player times out (see turnDeadlineAt), call instead of folding.
+  autoCallFold: boolean;
 }
+
+// How long a player has to act before they are auto-resolved, and how much
+// tapping the timer adds.
+export const DEFAULT_TURN_MS = 30_000;
+export const EXTEND_TURN_MS = 10_000;
 
 export interface GameSettings {
   smallBlind: number;
@@ -83,6 +90,7 @@ export interface RoomStateSnapshot {
   smallBlindSeat: number | null;
   bigBlindSeat: number | null;
   currentTurnPlayerId: string | null;
+  turnDeadlineAt: number | null;
   currentBetLevel: number;
   minRaise: number;
   seatingRearrangeActive: boolean;

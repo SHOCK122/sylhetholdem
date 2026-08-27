@@ -2,16 +2,19 @@ import type { CSSProperties } from 'react';
 import { PublicPlayerView } from '@sylhet/shared';
 import { ChipStack } from './ChipStack';
 import { CardBack, PlayingCard } from './PlayingCard';
+import { TurnTimer } from './TurnTimer';
 import './TableSeat.css';
 
 export function TableSeat({
   player,
   style,
   rearrangeTapIndex,
+  deadlineAt,
 }: {
   player: PublicPlayerView;
   style: CSSProperties;
   rearrangeTapIndex?: number | null;
+  deadlineAt?: number | null;
 }) {
   const classes = ['table-seat'];
   if (player.isTurn) classes.push('table-seat-turn');
@@ -47,6 +50,11 @@ export function TableSeat({
         {player.allIn && !player.folded && <div className="table-seat-tag table-seat-tag-allin">ALL IN</div>}
         {player.handDescription && <div className="table-seat-hand">{player.handDescription}</div>}
         {rearrangeTapIndex != null && <div className="table-seat-tapnum">{rearrangeTapIndex + 1}</div>}
+        {deadlineAt != null && (
+          <div className="table-seat-timer">
+            <TurnTimer deadlineAt={deadlineAt} />
+          </div>
+        )}
       </div>
       {player.currentStreetBet > 0 && (
         <div className="table-seat-bet">

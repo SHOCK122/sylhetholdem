@@ -8,17 +8,11 @@ import { TableSeat } from '../components/TableSeat';
 import { CommunityBoard } from '../components/CommunityBoard';
 import { PotBoard } from '../components/PotBoard';
 import { ChipFxLayer } from '../components/ChipFxLayer';
-import { QRCodeDisplay } from '../components/QRCodeDisplay';
+import { RoomQrPanel } from '../components/RoomQrPanel';
+import { FeltColorPicker } from '../components/FeltColorPicker';
+import { BlindsForm } from '../components/BlindsForm';
 import { darken } from '../colorUtils';
 import './TableScreen.css';
-
-const FELT_PRESETS = [
-  { name: 'Hunter Green', value: '#1e5631' },
-  { name: 'Midnight Blue', value: '#1a3a5c' },
-  { name: 'Burgundy', value: '#5c1a2e' },
-  { name: 'Charcoal', value: '#2b2b2b' },
-  { name: 'Royal Purple', value: '#3d1a5c' },
-];
 
 function seatPositions(n: number): Record<number, { x: number; y: number }> {
   const positions: Record<number, { x: number; y: number }> = {};
@@ -106,38 +100,12 @@ export default function TableScreen() {
         </div>
       </div>
 
-      {showQr && (
-        <div className="table-qr-panel">
-          <QRCodeDisplay url={joinUrl} size={168} />
-          <div className="table-qr-code">{view.roomCode}</div>
-          <div className="table-qr-hint">Scan to join</div>
-        </div>
-      )}
+      {showQr && <RoomQrPanel roomCode={view.roomCode} joinUrl={joinUrl} />}
 
       {showSettings && (
         <div className="table-settings-panel">
-          <div className="table-settings-title">Table Felt Color</div>
-          <div className="table-settings-swatches">
-            {FELT_PRESETS.map((preset) => (
-              <button
-                key={preset.value}
-                className={'swatch' + (feltColor === preset.value ? ' swatch-active' : '')}
-                style={{ background: preset.value }}
-                title={preset.name}
-                onClick={() => emitWithAck(SOCKET_EVENTS.TABLE_SET_COLOR, { color: preset.value }).catch(() => {})}
-              />
-            ))}
-            <input
-              type="color"
-              value={feltColor}
-              onChange={(e) => emitWithAck(SOCKET_EVENTS.TABLE_SET_COLOR, { color: e.target.value }).catch(() => {})}
-              className="swatch-custom"
-            />
-          </div>
-          <BlindsForm
-            smallBlind={view.settings.smallBlind}
-            bigBlind={view.settings.bigBlind}
-          />
+          <FeltColorPicker feltColor={feltColor} />
+          <BlindsForm smallBlind={view.settings.smallBlind} bigBlind={view.settings.bigBlind} />
         </div>
       )}
 
@@ -148,6 +116,7 @@ export default function TableScreen() {
               key={p.id}
               player={p}
               style={{ left: `${positions[p.seat]?.x ?? 50}%`, top: `${positions[p.seat]?.y ?? 50}%` }}
+              deadlineAt={p.isTurn ? view.turnDeadlineAt : null}
               rearrangeTapIndex={
                 view.seatingRearrangeActive ? (() => {
                   const idx = view.seatingTapOrder.indexOf(p.id);
@@ -194,30 +163,6 @@ export default function TableScreen() {
           {error}
         </div>
       )}
-    </div>
-  );
-}
-
-function BlindsForm({ smallBlind, bigBlind }: { smallBlind: number; bigBlind: number }) {
-  const [sb, setSb] = useState(smallBlind);
-  const [bb, setBb] = useState(bigBlind);
-  useEffect(() => setSb(smallBlind), [smallBlind]);
-  useEffect(() => setBb(bigBlind), [bigBlind]);
-  return (
-    <div className="table-settings-blinds">
-      <div className="table-settings-title">Blinds</div>
-      <div className="row" style={{ gap: '0.5rem' }}>
-        <input type="number" min={1} value={sb} onChange={(e) => setSb(Number(e.target.value) || 0)} />
-        <span>/</span>
-        <input type="number" min={2} value={bb} onChange={(e) => setBb(Number(e.target.value) || 0)} />
-        <button
-          className="btn btn-ghost btn-sm"
-          onClick={() => emitWithAck(SOCKET_EVENTS.TABLE_SET_BLINDS, { smallBlind: sb, bigBlind: bb }).catch(() => {})}
-        >
-          Apply
-        </button>
-      </div>
-      <div className="table-settings-hint">Applies starting next hand.</div>
     </div>
   );
 }
