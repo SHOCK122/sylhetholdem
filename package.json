@@ -1,0 +1,27 @@
+{
+  "name": "sylhet-holdem",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w server",
+    "dev:client": "npm run dev -w client",
+    "dev": "npm run build:shared && concurrently -n shared,server,client -c yellow,green,cyan \"npm run watch -w shared\" \"npm run dev -w server\" \"npm run dev -w client\"",
+    "build:shared": "npm run build -w shared",
+    "build:client": "npm run build -w client",
+    "build:server": "npm run build -w server",
+    "build": "npm run build:shared && npm run build:client && npm run build:server",
+    "start": "npm run start -w server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "esbuild@0.21.5": true
+  }
+}

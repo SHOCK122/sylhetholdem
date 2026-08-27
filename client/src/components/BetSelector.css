@@ -1,0 +1,92 @@
+.bet-selector {
+  background: var(--surface-2);
+  border-top: 2px solid rgba(217, 179, 82, 0.4);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 1rem 1.2rem calc(1rem + var(--safe-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.bet-selector-presets {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.bet-selector-main {
+  display: flex;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.bet-slider-track {
+  position: relative;
+  width: 64px;
+  height: 190px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  touch-action: none;
+  flex-shrink: 0;
+}
+
+.bet-slider-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(217, 179, 82, 0.55), rgba(217, 179, 82, 0.15));
+  border-radius: 999px;
+}
+
+.bet-slider-thumb {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 44px;
+}
+
+.bet-selector-amount {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.bet-amount-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.bet-selector-amount input {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--gold);
+  text-align: center;
+  width: 100%;
+}
+
+.bet-selector-range {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.bet-selector-actions {
+  display: flex;
+  gap: 0.7rem;
+}
+
+.bet-selector-actions .btn {
+  flex: 1;
+}

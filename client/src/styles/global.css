@@ -1,0 +1,230 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap');
+
+:root {
+  --felt: #1e5631;
+  --felt-dark: #123a20;
+  --felt-rail: #4a2c1a;
+  --felt-rail-dark: #2e1a0f;
+  --ink: #0c0c0c;
+  --paper: #f7f4ec;
+  --gold: #d9b352;
+  --danger: #c0392b;
+  --ok: #2f9e57;
+  --info: #2b7fc0;
+  --surface: #171a17;
+  --surface-2: #22261f;
+  --text: #f2efe6;
+  --text-dim: #b9b5a6;
+  --radius-lg: 20px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --shadow-deep: 0 12px 30px rgba(0, 0, 0, 0.55);
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--surface);
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+button {
+  font-family: inherit;
+}
+
+input {
+  font-family: inherit;
+}
+
+.btn {
+  appearance: none;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 0.85rem 1.4rem;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--text);
+  background: var(--surface-2);
+  transition: transform 0.08s ease, filter 0.15s ease;
+  touch-action: manipulation;
+}
+
+.btn:active {
+  transform: scale(0.96);
+}
+
+.btn-primary {
+  background: linear-gradient(180deg, #2f9e57, #1f7a41);
+  color: white;
+  box-shadow: 0 4px 14px rgba(47, 158, 87, 0.35);
+}
+
+.btn-danger {
+  background: linear-gradient(180deg, #d9483a, #a8291d);
+  color: white;
+}
+
+.btn-gold {
+  background: linear-gradient(180deg, #e6c46e, #c79a35);
+  color: #2b1d05;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.3);
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.felt-bg {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.07), transparent 60%),
+    repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.05) 0, rgba(0, 0, 0, 0.05) 2px, transparent 2px, transparent 4px),
+    linear-gradient(160deg, var(--felt), var(--felt-dark));
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+}
+
+.center {
+  align-items: center;
+  justify-content: center;
+}
+
+::selection {
+  background: var(--gold);
+  color: #221a00;
+}
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(3px);
+  z-index: 50;
+}
+
+.landing {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.landing-card {
+  width: 100%;
+  max-width: 420px;
+  background: rgba(10, 14, 10, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  padding: 2rem 1.75rem;
+  box-shadow: var(--shadow-deep);
+  backdrop-filter: blur(6px);
+}
+
+.landing-title {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: 2.4rem;
+  margin: 0 0 0.5rem;
+  color: var(--gold);
+  text-align: center;
+}
+
+.landing-sub {
+  text-align: center;
+  color: var(--text-dim);
+  margin: 0 0 2rem;
+  line-height: 1.4;
+}
+
+.landing-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.btn-big {
+  padding: 1.1rem;
+  font-size: 1.1rem;
+}
+
+.host-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.host-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.host-form input {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-sm);
+  padding: 0.7rem 0.85rem;
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.host-form input:focus {
+  outline: 2px solid var(--gold);
+}
+
+.form-error {
+  background: rgba(192, 57, 43, 0.15);
+  border: 1px solid var(--danger);
+  color: #ffd9d3;
+  padding: 0.6rem 0.8rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+}
+
+.toast-error {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--safe-bottom) + 16px);
+  transform: translateX(-50%);
+  background: #4a1a15;
+  border: 1px solid var(--danger);
+  color: #ffd9d3;
+  padding: 0.7rem 1.1rem;
+  border-radius: var(--radius-md);
+  z-index: 200;
+  font-size: 0.9rem;
+  max-width: 90vw;
+  text-align: center;
+  box-shadow: var(--shadow-deep);
+}

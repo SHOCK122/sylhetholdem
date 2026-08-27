@@ -1,0 +1,197 @@
+.player-screen {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
+  overflow: hidden;
+}
+
+.player-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.8rem;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.player-room-code {
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--gold);
+}
+
+.player-conn-ok {
+  color: var(--ok);
+}
+
+.player-conn-bad {
+  color: var(--danger);
+}
+
+.player-opponents {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.5rem 0.7rem;
+}
+
+.opponent-chip {
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.6rem;
+  text-align: center;
+  min-width: 74px;
+}
+
+.opponent-chip-turn {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px rgba(217, 179, 82, 0.4);
+}
+
+.opponent-chip-folded {
+  opacity: 0.45;
+}
+
+.opponent-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+}
+
+.opponent-stack {
+  color: var(--gold);
+  font-weight: 800;
+  font-size: 0.8rem;
+}
+
+.opponent-bet {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+}
+
+.opponent-tag {
+  font-size: 0.6rem;
+  color: #e08e6e;
+  font-weight: 700;
+}
+
+.opponent-tag-allin {
+  color: #e0c86e;
+}
+
+.player-board {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0 0.8rem;
+}
+
+.player-pot {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+}
+
+.player-pot strong {
+  color: var(--gold);
+}
+
+.player-result-banner {
+  text-align: center;
+  background: rgba(47, 158, 87, 0.18);
+  border: 1px solid var(--ok);
+  color: #d3f5df;
+  padding: 0.5rem 1rem;
+  margin: 0 0.8rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.player-self {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 0;
+}
+
+.player-self-header {
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+}
+
+.player-self-name {
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.player-self-chips {
+  color: var(--gold);
+  font-weight: 800;
+}
+
+.player-self-bet {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+}
+
+.player-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.8rem;
+  padding-bottom: calc(0.8rem + var(--safe-bottom));
+  background: rgba(0, 0, 0, 0.3);
+  flex-wrap: wrap;
+}
+
+.player-actions .btn {
+  flex: 1;
+  min-width: 80px;
+}
+
+.player-waiting {
+  text-align: center;
+  padding: 1rem;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.seating-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.seating-overlay-content {
+  text-align: center;
+  color: var(--gold);
+  padding: 2rem;
+}
+
+.seating-overlay-title {
+  font-size: 1.4rem;
+  font-weight: 800;
+  margin-bottom: 0.5rem;
+}
+
+.seating-overlay-sub {
+  color: var(--text-dim);
+}
