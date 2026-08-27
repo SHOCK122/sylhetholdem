@@ -19,7 +19,7 @@ export interface PublicPlayerView {
   holeCards: Card[] | null;
   lastAction: PlayerAction | null;
   handDescription?: string;
-  autoCallFold: boolean;
+  autoCheckFold: boolean;
 }
 
 export interface ValidActionsInfo {
@@ -113,7 +113,7 @@ export interface SetColorPayload {
   color: string;
 }
 
-export interface SetAutoCallFoldPayload {
+export interface SetAutoCheckFoldPayload {
   enabled: boolean;
 }
 
@@ -148,7 +148,7 @@ export const SOCKET_EVENTS = {
   PLAYER_ACTION: 'player:action',
   PLAYER_SEATING_TAP: 'player:seatingTap',
   PLAYER_EXTEND_TIMER: 'player:extendTimer',
-  PLAYER_SET_AUTO_CALL_FOLD: 'player:setAutoCallFold',
+  PLAYER_SET_AUTO_CHECK_FOLD: 'player:setAutoCheckFold',
 
   ROOM_VIEW: 'room:view',
   ROOM_ERROR: 'room:error',

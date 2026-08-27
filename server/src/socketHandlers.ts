@@ -10,7 +10,7 @@ import {
   PokerRuleError,
   ReconnectPlayerPayload,
   ReconnectTablePayload,
-  SetAutoCallFoldPayload,
+  SetAutoCheckFoldPayload,
   SetBlindsPayload,
   SetColorPayload,
   SOCKET_EVENTS,
@@ -241,9 +241,9 @@ export function registerSocketHandlers(io: Server) {
       });
     });
 
-    socket.on(SOCKET_EVENTS.PLAYER_SET_AUTO_CALL_FOLD, (payload: SetAutoCallFoldPayload) => {
+    socket.on(SOCKET_EVENTS.PLAYER_SET_AUTO_CHECK_FOLD, (payload: SetAutoCheckFoldPayload) => {
       requirePlayer(socket, (roomCode, entry, playerId) => {
-        runMutation(roomCode, entry, () => entry.room.setAutoCallFold(playerId, !!payload?.enabled));
+        runMutation(roomCode, entry, () => entry.room.setAutoCheckFold(playerId, !!payload?.enabled));
       });
     });
 

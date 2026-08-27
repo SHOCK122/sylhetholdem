@@ -57,7 +57,7 @@
   padding: 0.4rem 0 0.2rem;
 }
 
-.auto-call-fold-toggle {
+.auto-check-fold-toggle {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -67,7 +67,7 @@
   cursor: pointer;
 }
 
-.auto-call-fold-toggle input {
+.auto-check-fold-toggle input {
   width: 16px;
   height: 16px;
   accent-color: var(--gold);

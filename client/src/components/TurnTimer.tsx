@@ -6,10 +6,12 @@ const CIRCUMFERENCE = 2 * Math.PI * 15.5;
 
 export function TurnTimer({
   deadlineAt,
+  totalMs = DEFAULT_TURN_MS,
   interactive,
   onExtend,
 }: {
   deadlineAt: number | null;
+  totalMs?: number;
   interactive?: boolean;
   onExtend?: () => void;
 }) {
@@ -26,7 +28,7 @@ export function TurnTimer({
 
   const remainingMs = Math.max(0, deadlineAt - now);
   const seconds = Math.ceil(remainingMs / 1000);
-  const fraction = Math.max(0, Math.min(1, remainingMs / DEFAULT_TURN_MS));
+  const fraction = Math.max(0, Math.min(1, remainingMs / totalMs));
   const urgent = remainingMs < 6000;
 
   const ring = (

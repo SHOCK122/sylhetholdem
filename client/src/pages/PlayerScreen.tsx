@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { PlayerAction, SOCKET_EVENTS } from '@sylhet/shared';
+import { DEFAULT_TURN_MS, PlayerAction, QUICK_CHECK_FOLD_MS, SOCKET_EVENTS } from '@sylhet/shared';
 import { emitWithAck, getSocket } from '../socket';
 import { loadPlayerAuth } from '../storage';
 import { useRoomSocket } from '../hooks/useRoomSocket';
@@ -133,7 +133,7 @@ export default function PlayerScreen() {
             {p.allIn && !p.folded && <div className="opponent-tag opponent-tag-allin">all-in</div>}
             {p.isTurn && (
               <div className="opponent-timer">
-                <TurnTimer deadlineAt={view.turnDeadlineAt} />
+                <TurnTimer deadlineAt={view.turnDeadlineAt} totalMs={p.autoCheckFold ? QUICK_CHECK_FOLD_MS : DEFAULT_TURN_MS} />
               </div>
             )}
           </div>
@@ -175,13 +175,13 @@ export default function PlayerScreen() {
           </div>
         )}
         {me && (
-          <label className="auto-call-fold-toggle">
+          <label className="auto-check-fold-toggle">
             <input
               type="checkbox"
-              checked={me.autoCallFold}
-              onChange={(e) => emitWithAck(SOCKET_EVENTS.PLAYER_SET_AUTO_CALL_FOLD, { enabled: e.target.checked }).catch(() => {})}
+              checked={me.autoCheckFold}
+              onChange={(e) => emitWithAck(SOCKET_EVENTS.PLAYER_SET_AUTO_CHECK_FOLD, { enabled: e.target.checked }).catch(() => {})}
             />
-            Call instead of fold if my time runs out
+            Check or Fold (auto after 5s)
           </label>
         )}
       </div>
@@ -190,6 +190,7 @@ export default function PlayerScreen() {
         <div className="player-turn-timer">
           <TurnTimer
             deadlineAt={view.turnDeadlineAt}
+            totalMs={me?.autoCheckFold ? QUICK_CHECK_FOLD_MS : DEFAULT_TURN_MS}
             interactive
             onExtend={() => emitWithAck(SOCKET_EVENTS.PLAYER_EXTEND_TIMER).catch(() => {})}
           />

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { PublicPlayerView } from '@sylhet/shared';
+import { DEFAULT_TURN_MS, PublicPlayerView, QUICK_CHECK_FOLD_MS } from '@sylhet/shared';
 import { ChipStack } from './ChipStack';
 import { CardBack, PlayingCard } from './PlayingCard';
 import { TurnTimer } from './TurnTimer';
@@ -52,7 +52,7 @@ export function TableSeat({
         {rearrangeTapIndex != null && <div className="table-seat-tapnum">{rearrangeTapIndex + 1}</div>}
         {deadlineAt != null && (
           <div className="table-seat-timer">
-            <TurnTimer deadlineAt={deadlineAt} />
+            <TurnTimer deadlineAt={deadlineAt} totalMs={player.autoCheckFold ? QUICK_CHECK_FOLD_MS : DEFAULT_TURN_MS} />
           </div>
         )}
       </div>

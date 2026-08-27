@@ -8,6 +8,7 @@ import {
   PlayerState,
   Pot,
   PotResult,
+  QUICK_CHECK_FOLD_MS,
   RoomStateSnapshot,
 } from './types';
 import { createDeck, shuffleDeck } from './cards';
@@ -38,7 +39,7 @@ function makePlayer(id: string, name: string, seat: number, chips: number): Play
     hasActedThisStreet: false,
     lastAction: null,
     revealedAtShowdown: false,
-    autoCallFold: false,
+    autoCheckFold: false,
   };
 }
 
@@ -116,9 +117,9 @@ export class PokerRoom {
     if (p) p.connected = connected;
   }
 
-  setAutoCallFold(id: string, enabled: boolean): void {
+  setAutoCheckFold(id: string, enabled: boolean): void {
     const p = this.players.get(id);
-    if (p) p.autoCallFold = enabled;
+    if (p) p.autoCheckFold = enabled;
   }
 
   // A disconnected player can never be relied on to act, so they immediately
@@ -142,10 +143,10 @@ export class PokerRoom {
     this.turnDeadlineAt += EXTEND_TURN_MS;
   }
 
-  // Called by the server once a player's turnDeadlineAt has passed. Checking
-  // is always free, so timing out only ever risks a fold when there's an
-  // actual bet to respond to - and even then only if the player hasn't opted
-  // into auto-call via autoCallFold.
+  // Called by the server once a player's turnDeadlineAt has passed (either
+  // the normal turn clock, or the short one from autoCheckFold - see
+  // setCurrentTurn). Always resolves to a check if one is free, else a fold;
+  // it never calls a bet on the player's behalf.
   resolveTurnTimeout(id: string): void {
     if (this.currentTurnPlayerId !== id) return;
     const player = this.players.get(id);
@@ -153,8 +154,6 @@ export class PokerRoom {
     const toCall = this.currentBetLevel - player.currentStreetBet;
     if (toCall <= 0) {
       this.applyAction(id, { type: 'check' });
-    } else if (player.autoCallFold) {
-      this.applyAction(id, { type: 'call' });
     } else {
       this.applyAction(id, { type: 'fold' });
     }
@@ -292,7 +291,13 @@ export class PokerRoom {
 
   private setCurrentTurn(playerId: string | null): void {
     this.currentTurnPlayerId = playerId;
-    this.turnDeadlineAt = playerId ? Date.now() + DEFAULT_TURN_MS : null;
+    if (!playerId) {
+      this.turnDeadlineAt = null;
+      return;
+    }
+    const player = this.players.get(playerId);
+    const duration = player?.autoCheckFold ? QUICK_CHECK_FOLD_MS : DEFAULT_TURN_MS;
+    this.turnDeadlineAt = Date.now() + duration;
   }
 
   private postBlind(playerId: string, amount: number): void {

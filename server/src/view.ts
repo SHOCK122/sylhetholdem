@@ -34,7 +34,7 @@ export function buildRoomView(
       holeCards: showCards ? p.holeCards : null,
       lastAction: p.lastAction,
       handDescription,
-      autoCallFold: p.autoCallFold,
+      autoCheckFold: p.autoCheckFold,
     };
   });
 

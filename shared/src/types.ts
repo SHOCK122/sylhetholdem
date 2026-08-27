@@ -59,13 +59,17 @@ export interface PlayerState {
   hasActedThisStreet: boolean;
   lastAction: PlayerAction | null;
   revealedAtShowdown: boolean;
-  // When this player times out (see turnDeadlineAt), call instead of folding.
-  autoCallFold: boolean;
+  // When enabled, this player's turn clock is shortened to
+  // QUICK_CHECK_FOLD_MS and resolves to a check (if free) or a fold (if
+  // facing a bet) rather than waiting out the full turn timer.
+  autoCheckFold: boolean;
 }
 
-// How long a player has to act before they are auto-resolved, and how much
+// How long a player normally has to act before being auto-resolved, how
+// short that clock becomes when autoCheckFold is enabled, and how much
 // tapping the timer adds.
 export const DEFAULT_TURN_MS = 30_000;
+export const QUICK_CHECK_FOLD_MS = 5_000;
 export const EXTEND_TURN_MS = 10_000;
 
 export interface GameSettings {
