@@ -122,6 +122,17 @@
   text-align: center;
 }
 
+.timing-label {
+  font-size: 0.78rem;
+  color: var(--text);
+  flex: 1;
+}
+
+.timing-unit {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
 .table-settings-hint {
   font-size: 0.7rem;
   color: var(--text-dim);
@@ -181,6 +192,13 @@
   justify-content: center;
   background: var(--surface);
   z-index: 30;
+}
+
+.table-deal-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
 }
 
 .table-waiting,

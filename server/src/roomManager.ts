@@ -1,5 +1,5 @@
 import crypto from 'crypto';
-import { GameSettings, PokerRoom } from '@sylhet/shared';
+import { DEFAULT_AUTO_DEAL_MS, DEFAULT_TURN_MS, GameSettings, PokerRoom } from '@sylhet/shared';
 
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
 
@@ -34,6 +34,8 @@ const DEFAULT_SETTINGS: GameSettings = {
   bigBlind: 10,
   startingChips: 1000,
   tableColor: '#1e5631', // hunter green
+  turnDurationMs: DEFAULT_TURN_MS,
+  autoDealDelayMs: DEFAULT_AUTO_DEAL_MS,
 };
 
 export function createRoom(settings: Partial<GameSettings> = {}): RoomEntry {

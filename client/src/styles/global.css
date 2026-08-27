@@ -212,6 +212,13 @@ input {
   font-size: 0.85rem;
 }
 
+.auto-deal-countdown {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  text-align: center;
+  font-weight: 600;
+}
+
 .toast-error {
   position: fixed;
   left: 50%;

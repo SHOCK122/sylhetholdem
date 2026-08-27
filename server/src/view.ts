@@ -53,6 +53,7 @@ export function buildRoomView(
     bigBlindSeat: snapshot.bigBlindSeat,
     currentTurnPlayerId: snapshot.currentTurnPlayerId,
     turnDeadlineAt: snapshot.turnDeadlineAt,
+    autoDealDeadlineAt: snapshot.autoDealDeadlineAt,
     currentBetLevel: snapshot.currentBetLevel,
     minRaise: snapshot.minRaise,
     seatingRearrangeActive: snapshot.seatingRearrangeActive,
