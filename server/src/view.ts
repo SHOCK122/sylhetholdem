@@ -55,6 +55,7 @@ export function buildRoomView(
     currentTurnPlayerId: snapshot.currentTurnPlayerId,
     turnDeadlineAt: snapshot.turnDeadlineAt,
     autoDealDeadlineAt: snapshot.autoDealDeadlineAt,
+    gameOverRestartAt: snapshot.gameOverRestartAt,
     dealCountdownDeadlineAt: snapshot.dealCountdownDeadlineAt,
     currentBetLevel: snapshot.currentBetLevel,
     minRaise: snapshot.minRaise,

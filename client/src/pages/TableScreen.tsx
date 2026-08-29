@@ -174,6 +174,11 @@ export default function TableScreen() {
             </button>
             <AutoDealCountdown deadlineAt={view.autoDealDeadlineAt} />
           </div>
+        ) : view.gameOverRestartAt ? (
+          <div className="table-hand-status">
+            <div>Game over</div>
+            <AutoDealCountdown deadlineAt={view.gameOverRestartAt} label="New game in" />
+          </div>
         ) : (
           <div className="table-hand-status">
             Hand #{view.handNumber} — {view.phase.toUpperCase()}

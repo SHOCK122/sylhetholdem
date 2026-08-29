@@ -3,9 +3,11 @@ import { useEffect, useState } from 'react';
 export function AutoDealCountdown({
   deadlineAt,
   lockedDeadlineAt,
+  label,
 }: {
   deadlineAt: number | null;
   lockedDeadlineAt?: number | null;
+  label?: string;
 }) {
   const active = lockedDeadlineAt ?? deadlineAt;
   const [now, setNow] = useState(() => Date.now());
@@ -23,5 +25,5 @@ export function AutoDealCountdown({
   if (lockedDeadlineAt) {
     return <div className="auto-deal-countdown auto-deal-countdown-locked">Dealing in {seconds}s…</div>;
   }
-  return <div className="auto-deal-countdown">Next hand in {seconds}s</div>;
+  return <div className="auto-deal-countdown">{label ?? 'Next hand in'} {seconds}s</div>;
 }

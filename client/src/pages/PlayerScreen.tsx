@@ -316,12 +316,24 @@ export default function PlayerScreen() {
               </button>
               <AutoDealCountdown deadlineAt={view.autoDealDeadlineAt} />
             </div>
+          ) : view.gameOverRestartAt ? (
+            <div className="table-deal-stack">
+              <div>Game over</div>
+              <AutoDealCountdown deadlineAt={view.gameOverRestartAt} label="New game in" />
+            </div>
           ) : null}
         </div>
       )}
 
       {view.hasTable && (
-        <AutoDealCountdown deadlineAt={view.autoDealDeadlineAt} lockedDeadlineAt={view.dealCountdownDeadlineAt} />
+        <>
+          <AutoDealCountdown deadlineAt={view.autoDealDeadlineAt} lockedDeadlineAt={view.dealCountdownDeadlineAt} />
+          {view.gameOverRestartAt && (
+            <div className="player-waiting">
+              Game over — <AutoDealCountdown deadlineAt={view.gameOverRestartAt} label="New game in" />
+            </div>
+          )}
+        </>
       )}
 
       {showSeatingOverlay && (
