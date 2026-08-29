@@ -5,6 +5,7 @@
   padding: 0.6rem 0.9rem;
   min-width: 200px;
   text-align: center;
+  box-shadow: var(--shadow-deep);
 }
 
 .pot-board-total {
@@ -13,6 +14,19 @@
   justify-content: center;
   gap: 0.5rem;
   margin-bottom: 4px;
+  animation: pot-pulse 0.35s ease-out;
+}
+
+@keyframes pot-pulse {
+  0% {
+    transform: scale(0.85);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .pot-board-total-value {

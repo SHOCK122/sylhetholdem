@@ -23,7 +23,7 @@ export function PotBoard({
 
   return (
     <div className="pot-board">
-      <div className="pot-board-total">
+      <div className="pot-board-total" key={total}>
         <ChipStack amount={total} size={26} />
         <span className="pot-board-total-value">{total.toLocaleString()}</span>
       </div>

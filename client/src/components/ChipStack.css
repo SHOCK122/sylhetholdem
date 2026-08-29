@@ -15,4 +15,16 @@
   position: absolute;
   left: 0;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.45));
+  animation: chip-stack-chip-in 0.25s ease-out;
+}
+
+@keyframes chip-stack-chip-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.7);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }

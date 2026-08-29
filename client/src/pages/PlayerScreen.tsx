@@ -7,6 +7,7 @@ import { useRoomSocket } from '../hooks/useRoomSocket';
 import { useClickOutside } from '../hooks/useClickOutside';
 import { HoleCards } from '../components/HoleCards';
 import { ChipStack } from '../components/ChipStack';
+import { ChipPile } from '../components/ChipPile';
 import { CommunityBoard } from '../components/CommunityBoard';
 import { BetSelector } from '../components/BetSelector';
 import { TurnTimer } from '../components/TurnTimer';
@@ -142,6 +143,7 @@ export default function PlayerScreen() {
         {others.map((p) => (
           <div key={p.id} className={'opponent-chip' + (p.isTurn ? ' opponent-chip-turn' : '') + (p.folded ? ' opponent-chip-folded' : '')}>
             <div className="opponent-name">{p.name}</div>
+            <ChipPile amount={p.chips} size={12} />
             <div className="opponent-stack">{p.chips.toLocaleString()}</div>
             {p.currentStreetBet > 0 && <div className="opponent-bet">bet {p.currentStreetBet.toLocaleString()}</div>}
             {p.folded && <div className="opponent-tag">folded</div>}
@@ -158,8 +160,11 @@ export default function PlayerScreen() {
       <div className="player-board">
         <CommunityBoard cards={view.communityCards} burnCount={view.burnCount} />
         {potTotal > 0 && (
-          <div className="player-pot">
-            Pot: <strong>{potTotal.toLocaleString()}</strong>
+          <div className="player-pot" key={potTotal}>
+            <ChipStack amount={potTotal} size={20} compact />
+            <span>
+              Pot: <strong>{potTotal.toLocaleString()}</strong>
+            </span>
           </div>
         )}
       </div>
@@ -180,6 +185,7 @@ export default function PlayerScreen() {
       <div className="player-self">
         <div className="player-self-header">
           <span className="player-self-name">{me?.name ?? auth.name}</span>
+          <ChipPile amount={me?.chips ?? 0} size={18} />
           <span className="player-self-chips">{(me?.chips ?? 0).toLocaleString()} chips</span>
         </div>
         <HoleCards cards={me?.holeCards ?? null} />

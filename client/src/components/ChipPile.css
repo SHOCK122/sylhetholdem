@@ -1,0 +1,32 @@
+.chip-pile {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-end;
+  margin: 2px 0;
+  height: calc(var(--chip-size) * 1.8);
+  /* Single soft shadow for the whole pile - not per chip. */
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.45));
+}
+
+.chip-pile-col {
+  position: relative;
+  width: var(--chip-size);
+  height: 100%;
+  margin-left: calc(var(--chip-size) * -0.32);
+}
+
+.chip-pile-col:first-child {
+  margin-left: 0;
+}
+
+.chip-pile-disc {
+  position: absolute;
+  left: 0;
+  width: var(--chip-size);
+  height: calc(var(--chip-size) * 0.6);
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.4);
+  box-shadow:
+    inset 0 -2px 0 rgba(0, 0, 0, 0.28),
+    inset 0 2px 0 rgba(255, 255, 255, 0.28);
+}

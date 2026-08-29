@@ -219,6 +219,25 @@ input {
   font-weight: 600;
 }
 
+@keyframes card-deal-in {
+  0% {
+    opacity: 0;
+    transform: translate(var(--deal-x, 0px), var(--deal-y, -46px)) scale(0.45) rotate(-10deg);
+  }
+  65% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+}
+
+.card-deal {
+  animation: card-deal-in 0.4s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: var(--deal-delay, 0ms);
+}
+
 .toast-error {
   position: fixed;
   left: 50%;

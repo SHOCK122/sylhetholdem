@@ -28,7 +28,7 @@ export function HoleCards({ cards }: { cards: Card[] | null }) {
       onContextMenu={(e) => e.preventDefault()}
     >
       {cards.map((c, i) => (
-        <div className="hole-card-slot" key={i}>
+        <div className="hole-card-slot card-deal" style={{ ['--deal-delay' as any]: `${i * 100}ms` }} key={i}>
           {revealed ? <PlayingCard card={c} /> : <CardBack />}
         </div>
       ))}

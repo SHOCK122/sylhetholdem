@@ -9,9 +9,24 @@
   position: absolute;
   width: 34px;
   height: 34px;
-  transform: translate(-50%, -50%);
   transition: left 0.7s cubic-bezier(0.22, 0.61, 0.36, 1), top 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
   filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
+  animation: chip-land-pop 0.75s ease-out;
+}
+
+@keyframes chip-land-pop {
+  0% {
+    transform: translate(-50%, -50%) scale(0.7) rotate(-25deg);
+  }
+  70% {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+  }
+  85% {
+    transform: translate(-50%, -50%) scale(1.2) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+  }
 }
 
 .flying-chip svg {

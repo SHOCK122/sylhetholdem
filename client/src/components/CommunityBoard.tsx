@@ -13,9 +13,18 @@ export function CommunityBoard({ cards, burnCount }: { cards: Card[]; burnCount:
         </div>
       )}
       <div className="community-slots">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <CardSlot key={i} card={cards[i] ?? null} faceUp className="community-card" />
-        ))}
+        {Array.from({ length: 5 }).map((_, i) => {
+          const card = cards[i] ?? null;
+          return (
+            <div
+              key={`${i}-${card ? `${card.rank}${card.suit}` : 'empty'}`}
+              className={card ? 'card-deal' : undefined}
+              style={card ? { ['--deal-delay' as any]: `${i * 100}ms` } : undefined}
+            >
+              <CardSlot card={card} faceUp className="community-card" />
+            </div>
+          );
+        })}
       </div>
     </div>
   );

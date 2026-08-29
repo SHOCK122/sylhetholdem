@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { PublicPlayerView, QUICK_CHECK_FOLD_MS } from '@sylhet/shared';
 import { ChipStack } from './ChipStack';
+import { ChipPile } from './ChipPile';
 import { CardBack, PlayingCard } from './PlayingCard';
 import { TurnTimer } from './TurnTimer';
 import './TableSeat.css';
@@ -34,20 +35,21 @@ export function TableSeat({
       <div className="table-seat-card">
         {player.holeCardCount > 0 && (
           <div className="table-seat-holecards">
-            {Array.from({ length: player.holeCardCount }).map((_, i) =>
-              player.holeCards ? (
-                <PlayingCard key={i} card={player.holeCards[i]} dimmed={player.folded} />
-              ) : (
-                <CardBack key={i} />
-              )
-            )}
+            {Array.from({ length: player.holeCardCount }).map((_, i) => (
+              <div className="card-deal" style={{ ['--deal-delay' as any]: `${i * 90}ms` }} key={i}>
+                {player.holeCards ? <PlayingCard card={player.holeCards[i]} dimmed={player.folded} /> : <CardBack />}
+              </div>
+            ))}
           </div>
         )}
         <div className="table-seat-name">
           {player.name}
           {!player.connected && <span className="table-seat-offline"> (offline)</span>}
         </div>
-        <div className="table-seat-chips-value">{player.chips.toLocaleString()}</div>
+        <div className="table-seat-stack">
+          <ChipPile amount={player.chips} size={16} />
+          <div className="table-seat-chips-value">{player.chips.toLocaleString()}</div>
+        </div>
         {player.folded && <div className="table-seat-tag">FOLDED</div>}
         {player.allIn && !player.folded && <div className="table-seat-tag table-seat-tag-allin">ALL IN</div>}
         {player.handDescription && <div className="table-seat-hand">{player.handDescription}</div>}
