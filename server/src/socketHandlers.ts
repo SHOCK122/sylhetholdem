@@ -7,6 +7,7 @@ import {
   ErrorPayload,
   JoinPlayerPayload,
   JoinPlayerResult,
+  PokerRoom,
   PokerRuleError,
   ReconnectPlayerPayload,
   ReconnectTablePayload,
@@ -16,8 +17,8 @@ import {
   SetTimingPayload,
   SOCKET_EVENTS,
 } from '@sylhet/shared';
-import { createRoom, generatePlayerId, generateToken, getRoom, RoomEntry } from './roomManager';
-import { buildRoomView } from './view';
+import { createRoom, generatePlayerId, generateToken, getRoom, onRoomReaped, RoomEntry } from './roomManager';
+import { buildRoomProjection, viewFor } from './view';
 
 interface SocketData {
   role?: 'table' | 'player';
@@ -48,117 +49,107 @@ function joinPlayerToRoom(
   playerSockets.get(entry.room.roomCode)!.set(playerId, socket.id);
 }
 
+// Every scheduled behaviour in a room is an absolute deadline stored on
+// PokerRoom paired with the method that resolves it once that deadline passes.
+// Keeping the deadline on the room (rather than only in setTimeout) is what
+// lets a reconnecting client derive the same countdown from its snapshot.
+interface Schedule {
+  // The room's deadline for this behaviour, or null when it isn't armed.
+  deadline: (room: PokerRoom) => number | null;
+  // Runs when the deadline passes. Each resolve* method re-validates the room
+  // for itself, since state can move on between arming and firing.
+  resolve: (room: PokerRoom) => void;
+  // Identity re-checked when the timer fires; a change means this timer is
+  // stale and must not act. Defaults to the deadline itself.
+  identity?: (room: PokerRoom) => unknown;
+}
+
+const SCHEDULES: Record<string, Schedule> = {
+  // Guarded by whose turn it is rather than by the deadline, because tapping
+  // the timer extends turnDeadlineAt in place (see PokerRoom.extendTurnTimer).
+  turn: {
+    deadline: (room) => (room.currentTurnPlayerId ? room.turnDeadlineAt : null),
+    identity: (room) => room.currentTurnPlayerId,
+    resolve: (room) => {
+      if (room.currentTurnPlayerId) room.resolveTurnTimeout(room.currentTurnPlayerId);
+    },
+  },
+  autoDeal: {
+    deadline: (room) => room.autoDealDeadlineAt,
+    resolve: (room) => room.resolveAutoDeal(),
+  },
+  dealCountdown: {
+    deadline: (room) => room.dealCountdownDeadlineAt,
+    resolve: (room) => room.resolveDealCountdown(),
+  },
+  gameOver: {
+    deadline: (room) => room.gameOverRestartAt,
+    resolve: (room) => room.resolveGameOverRestart(),
+  },
+};
+
 export function registerSocketHandlers(io: Server) {
-  const turnTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  const autoDealTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  const dealCountdownTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  const gameOverTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  // roomCode -> schedule name -> pending handle.
+  const timers = new Map<string, Map<string, ReturnType<typeof setTimeout>>>();
 
-  function scheduleTurnTimer(roomCode: string) {
-    const existing = turnTimers.get(roomCode);
-    if (existing) clearTimeout(existing);
-    turnTimers.delete(roomCode);
-
-    const entry = getRoom(roomCode);
-    if (!entry) return;
-    const { currentTurnPlayerId, turnDeadlineAt } = entry.room;
-    if (!currentTurnPlayerId || turnDeadlineAt === null) return;
-
-    const delay = Math.max(0, turnDeadlineAt - Date.now());
-    const handle = setTimeout(() => {
-      turnTimers.delete(roomCode);
-      const liveEntry = getRoom(roomCode);
-      if (!liveEntry) return;
-      // Defensive re-check: state may have moved on between scheduling and firing.
-      if (liveEntry.room.currentTurnPlayerId !== currentTurnPlayerId) return;
-      runMutation(roomCode, liveEntry, () => liveEntry.room.resolveTurnTimeout(currentTurnPlayerId));
-    }, delay);
-    turnTimers.set(roomCode, handle);
+  function clearRoomTimers(roomCode: string) {
+    const handles = timers.get(roomCode);
+    if (!handles) return;
+    for (const handle of handles.values()) clearTimeout(handle);
+    timers.delete(roomCode);
   }
 
-  function scheduleAutoDealTimer(roomCode: string) {
-    const existing = autoDealTimers.get(roomCode);
-    if (existing) clearTimeout(existing);
-    autoDealTimers.delete(roomCode);
-
+  // Re-arms every SCHEDULES entry for a room from its current state, replacing
+  // whatever was pending. Called after each mutation, so a deadline that moved
+  // (or cleared) always leaves exactly one live timer behind it.
+  function scheduleRoomTimers(roomCode: string) {
+    clearRoomTimers(roomCode);
     const entry = getRoom(roomCode);
     if (!entry) return;
-    const deadline = entry.room.autoDealDeadlineAt;
-    if (deadline === null) return;
 
-    const delay = Math.max(0, deadline - Date.now());
-    const handle = setTimeout(() => {
-      autoDealTimers.delete(roomCode);
-      const liveEntry = getRoom(roomCode);
-      if (!liveEntry) return;
-      // Defensive re-check: state may have moved on between scheduling and firing.
-      if (liveEntry.room.autoDealDeadlineAt !== deadline) return;
-      runMutation(roomCode, liveEntry, () => liveEntry.room.resolveAutoDeal());
-    }, delay);
-    autoDealTimers.set(roomCode, handle);
+    const handles = new Map<string, ReturnType<typeof setTimeout>>();
+    for (const [name, schedule] of Object.entries(SCHEDULES)) {
+      const deadline = schedule.deadline(entry.room);
+      if (deadline === null) continue;
+      const identity = schedule.identity ? schedule.identity(entry.room) : deadline;
+
+      handles.set(
+        name,
+        setTimeout(() => {
+          timers.get(roomCode)?.delete(name);
+          const liveEntry = getRoom(roomCode);
+          if (!liveEntry) return;
+          const current = schedule.identity ? schedule.identity(liveEntry.room) : schedule.deadline(liveEntry.room);
+          if (current !== identity) return;
+          runMutation(roomCode, liveEntry, () => schedule.resolve(liveEntry.room));
+        }, Math.max(0, deadline - Date.now()))
+      );
+    }
+    if (handles.size > 0) timers.set(roomCode, handles);
   }
 
-  function scheduleDealCountdownTimer(roomCode: string) {
-    const existing = dealCountdownTimers.get(roomCode);
-    if (existing) clearTimeout(existing);
-    dealCountdownTimers.delete(roomCode);
-
-    const entry = getRoom(roomCode);
-    if (!entry) return;
-    const deadline = entry.room.dealCountdownDeadlineAt;
-    if (deadline === null) return;
-
-    const delay = Math.max(0, deadline - Date.now());
-    const handle = setTimeout(() => {
-      dealCountdownTimers.delete(roomCode);
-      const liveEntry = getRoom(roomCode);
-      if (!liveEntry) return;
-      // Defensive re-check: state may have moved on between scheduling and firing.
-      if (liveEntry.room.dealCountdownDeadlineAt !== deadline) return;
-      runMutation(roomCode, liveEntry, () => liveEntry.room.resolveDealCountdown());
-    }, delay);
-    dealCountdownTimers.set(roomCode, handle);
-  }
-
-  function scheduleGameOverTimer(roomCode: string) {
-    const existing = gameOverTimers.get(roomCode);
-    if (existing) clearTimeout(existing);
-    gameOverTimers.delete(roomCode);
-
-    const entry = getRoom(roomCode);
-    if (!entry) return;
-    const deadline = entry.room.gameOverRestartAt;
-    if (deadline === null) return;
-
-    const delay = Math.max(0, deadline - Date.now());
-    const handle = setTimeout(() => {
-      gameOverTimers.delete(roomCode);
-      const liveEntry = getRoom(roomCode);
-      if (!liveEntry) return;
-      // Defensive re-check: state may have moved on between scheduling and firing.
-      if (liveEntry.room.gameOverRestartAt !== deadline) return;
-      runMutation(roomCode, liveEntry, () => liveEntry.room.resolveGameOverRestart());
-    }, delay);
-    gameOverTimers.set(roomCode, handle);
-  }
+  // A reaped room's pending timers and socket index would otherwise outlive it.
+  onRoomReaped((roomCode) => {
+    clearRoomTimers(roomCode);
+    playerSockets.delete(roomCode);
+  });
 
   function broadcastRoom(roomCode: string) {
     const entry = getRoom(roomCode);
     if (!entry) return;
-    const hasTable = entry.tableSocketId !== null;
+    // The viewer-independent half of the view is built once and shared; only
+    // each socket's own hole cards and available actions differ.
+    const projection = buildRoomProjection(entry.room, entry.tableSocketId !== null);
     if (entry.tableSocketId) {
-      io.to(entry.tableSocketId).emit(SOCKET_EVENTS.ROOM_VIEW, buildRoomView(entry.room, 'table', undefined, hasTable));
+      io.to(entry.tableSocketId).emit(SOCKET_EVENTS.ROOM_VIEW, viewFor(projection, 'table'));
     }
     const sockets = playerSockets.get(roomCode);
     if (sockets) {
       for (const [playerId, socketId] of sockets) {
-        io.to(socketId).emit(SOCKET_EVENTS.ROOM_VIEW, buildRoomView(entry.room, 'player', playerId, hasTable));
+        io.to(socketId).emit(SOCKET_EVENTS.ROOM_VIEW, viewFor(projection, 'player', playerId));
       }
     }
-    scheduleTurnTimer(roomCode);
-    scheduleAutoDealTimer(roomCode);
-    scheduleDealCountdownTimer(roomCode);
-    scheduleGameOverTimer(roomCode);
+    scheduleRoomTimers(roomCode);
   }
 
   function runMutation(roomCode: string, entry: RoomEntry, mutate: () => void, socket?: Socket) {
@@ -350,6 +341,7 @@ export function registerSocketHandlers(io: Server) {
         const sockets = playerSockets.get(roomCode);
         if (sockets && sockets.get(playerId) === socket.id) {
           sockets.delete(playerId);
+          if (sockets.size === 0) playerSockets.delete(roomCode);
           entry.room.setConnected(playerId, false);
           entry.room.forceFoldPlayer(playerId);
         }

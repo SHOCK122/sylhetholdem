@@ -16,6 +16,7 @@ import { FeltColorPicker } from '../components/FeltColorPicker';
 import { BlindsForm } from '../components/BlindsForm';
 import { TimingForm } from '../components/TimingForm';
 import { AutoDealCountdown } from '../components/AutoDealCountdown';
+import { DealControls, GameOverCountdown } from '../components/DealControls';
 import { darken } from '../colorUtils';
 import './PlayerScreen.css';
 import '../pages/TableScreen.css';
@@ -98,6 +99,7 @@ export default function PlayerScreen() {
   }
 
   const handEnded = view.phase === 'showdown' || view.phase === 'hand-complete';
+  const handIdle = handEnded || view.phase === 'lobby';
   const forceCardsRevealed = !!me && ((handEnded && !me.folded) || me.revealedAtShowdown);
   const canRevealCards = !!me && me.folded && handEnded && !me.revealedAtShowdown;
 
@@ -195,7 +197,7 @@ export default function PlayerScreen() {
         </div>
       )}
 
-      {(view.phase === 'showdown' || view.phase === 'hand-complete') && view.potResults && view.potResults.length > 0 && (
+      {handEnded && view.potResults && view.potResults.length > 0 && (
         <div className="player-result-banner">
           {view.potResults.flatMap((pr) =>
             pr.winners.map((w, i) => (
@@ -299,42 +301,25 @@ export default function PlayerScreen() {
         />
       )}
 
-      {!isMyTurn && view.phase !== 'lobby' && view.phase !== 'hand-complete' && view.phase !== 'showdown' && (
-        <div className="player-waiting">Waiting for other players…</div>
-      )}
+      {!isMyTurn && !handIdle && <div className="player-waiting">Waiting for other players…</div>}
 
-      {!view.hasTable && (view.phase === 'lobby' || view.phase === 'hand-complete' || view.phase === 'showdown') && (
+      {/* With no table connected, players run the room themselves and get the
+          full deal controls. With a table, the table owns those - players just
+          watch whichever countdown is running. */}
+      {!view.hasTable && handIdle && (
         <div className="player-tableless-deal">
-          {view.players.length < 2 ? (
-            <div className="table-waiting">Waiting for at least 2 players to join…</div>
-          ) : view.dealCountdownDeadlineAt ? (
-            <AutoDealCountdown deadlineAt={null} lockedDeadlineAt={view.dealCountdownDeadlineAt} />
-          ) : view.canStartHand ? (
-            <div className="table-deal-stack">
-              <button className="btn btn-primary btn-big" onClick={() => emitWithAck(SOCKET_EVENTS.TABLE_START_HAND).catch(() => {})}>
-                {view.handNumber === 0 ? 'Deal First Hand' : 'Deal Next Hand'}
-              </button>
-              <AutoDealCountdown deadlineAt={view.autoDealDeadlineAt} />
-            </div>
-          ) : view.gameOverRestartAt ? (
-            <div className="table-deal-stack">
-              <div>Game over</div>
-              <AutoDealCountdown deadlineAt={view.gameOverRestartAt} label="New game in" />
-            </div>
-          ) : null}
+          <DealControls view={view} />
         </div>
       )}
 
-      {view.hasTable && (
-        <>
+      {view.hasTable &&
+        (view.gameOverRestartAt ? (
+          <div className="player-tableless-deal">
+            <GameOverCountdown deadlineAt={view.gameOverRestartAt} />
+          </div>
+        ) : (
           <AutoDealCountdown deadlineAt={view.autoDealDeadlineAt} lockedDeadlineAt={view.dealCountdownDeadlineAt} />
-          {view.gameOverRestartAt && (
-            <div className="player-waiting">
-              Game over — <AutoDealCountdown deadlineAt={view.gameOverRestartAt} label="New game in" />
-            </div>
-          )}
-        </>
-      )}
+        ))}
 
       {showSeatingOverlay && (
         <div className="scrim seating-overlay" onClick={() => emitWithAck(SOCKET_EVENTS.PLAYER_SEATING_TAP).catch(() => {})}>
