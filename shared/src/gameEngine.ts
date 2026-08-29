@@ -68,7 +68,7 @@ export class PokerRoom {
   // uninterruptible countdown that nothing (not even card touches) resets.
   dealCountdownDeadlineAt: number | null = null;
   // Set once a hand ends leaving fewer than 2 players with chips (the game
-  // is over) - see maybeScheduleGameOverRestart.
+  // is over) - see refreshBetweenHandsTimers.
   gameOverRestartAt: number | null = null;
   currentBetLevel = 0;
   minRaise = 0;
@@ -92,15 +92,12 @@ export class PokerRoom {
   addPlayer(id: string, name: string): PlayerState {
     if (this.players.has(id)) return this.players.get(id) as PlayerState;
     const seat = this.seatOrder.length;
+    // Joiners are never dealt into a hand already in progress: startHand
+    // rebuilds handPlayerIds from scratch, so they simply come in next hand.
     const player = makePlayer(id, name, seat, this.settings.startingChips);
-    if (this.phase !== 'lobby') {
-      // Mid-game joiners sit out until the next hand.
-      player.isSittingOut = false;
-    }
     this.players.set(id, player);
     this.seatOrder.push(id);
-    this.maybeScheduleAutoDeal(); // a new player may push an idle room back over the 2-player minimum
-    this.maybeScheduleGameOverRestart();
+    this.refreshBetweenHandsTimers(); // a new player may push an idle room back over the 2-player minimum
     return player;
   }
 
@@ -114,14 +111,12 @@ export class PokerRoom {
       if (p) p.seat = idx;
     });
     if (wasInHand) {
-      const player = this.players.get(id);
-      if (!player) {
-        this.handPlayerIds = this.handPlayerIds.filter((pid) => pid !== id);
-      }
+      this.handPlayerIds = this.handPlayerIds.filter((pid) => pid !== id);
+      // Only does anything if a hand is actually live - see
+      // checkRoundOrHandProgress, which no-ops between hands.
       this.checkRoundOrHandProgress();
     }
-    this.maybeScheduleAutoDeal();
-    this.maybeScheduleGameOverRestart();
+    this.refreshBetweenHandsTimers();
   }
 
   setConnected(id: string, connected: boolean): void {
@@ -139,7 +134,7 @@ export class PokerRoom {
   // actually is right now. Safe to call any time (no-op outside a live hand,
   // or if the player is already folded/all-in/not in this hand).
   forceFoldPlayer(id: string): void {
-    if (this.phase === 'lobby' || this.phase === 'hand-complete' || this.phase === 'showdown') return;
+    if (this.phase === 'lobby' || this.isBetweenHands()) return;
     if (!this.handPlayerIds.includes(id)) return;
     const player = this.players.get(id);
     if (!player || player.folded || player.allIn) return;
@@ -187,7 +182,7 @@ export class PokerRoom {
   // auto-deals. Either may be omitted to leave it unchanged. A turn-duration
   // change only takes effect on the next turn it's computed for; an
   // auto-deal-delay change takes effect immediately if a deal is currently
-  // pending (see maybeScheduleAutoDeal).
+  // pending (see refreshBetweenHandsTimers).
   setTiming(turnDurationMs?: number, autoDealDelayMs?: number): void {
     if (turnDurationMs !== undefined) {
       if (!Number.isFinite(turnDurationMs) || turnDurationMs < 5_000 || turnDurationMs > 120_000) {
@@ -201,51 +196,37 @@ export class PokerRoom {
       }
       this.settings.autoDealDelayMs = autoDealDelayMs;
     }
-    this.maybeScheduleAutoDeal();
-    this.maybeScheduleGameOverRestart();
+    this.refreshBetweenHandsTimers();
   }
 
-  // Arms (or disarms) the auto-deal countdown based on current state. Called
-  // whenever something could change whether a deal should be pending: a hand
-  // ending, seating rearrange starting/finishing, or the delay setting itself
-  // changing. Once the uninterruptible deal countdown has taken over
-  // (dealCountdownDeadlineAt set), the idle auto-deal countdown stays disarmed.
-  private maybeScheduleAutoDeal(): void {
-    if (this.dealCountdownDeadlineAt !== null) {
-      this.autoDealDeadlineAt = null;
-      return;
-    }
-    if (!this.seatingRearrangeActive && (this.phase === 'hand-complete' || this.phase === 'showdown') && this.canStartHand()) {
-      this.autoDealDeadlineAt = Date.now() + this.settings.autoDealDelayMs;
-    } else {
-      this.autoDealDeadlineAt = null;
-    }
+  // True in the window between hands, where a deal or a game-over restart can
+  // be pending. Deliberately excludes 'lobby': nothing is scheduled before the
+  // first hand is dealt by hand.
+  private isBetweenHands(): boolean {
+    return this.phase === 'hand-complete' || this.phase === 'showdown';
   }
 
-  // Called by the server once autoDealDeadlineAt has passed. Re-validates
-  // everything since time may have moved the room on (someone dealt manually,
-  // started a seating rearrange, etc).
-  resolveAutoDeal(): void {
-    if (this.phase !== 'hand-complete' && this.phase !== 'showdown') return;
-    if (this.seatingRearrangeActive) return;
-    if (!this.canStartHand()) return;
-    this.startHand();
-  }
+  // Arms (or disarms) both between-hands countdowns from current state. They
+  // are two halves of one decision - at most one can ever be pending - so
+  // every mutation that could change either calls this single method:
+  //
+  //   autoDealDeadlineAt  a hand can start, so deal after autoDealDelayMs.
+  //                       Pushed back by card touches (see touchCards).
+  //   gameOverRestartAt   a hand cannot start (fewer than 2 players still hold
+  //                       chips - the game itself is over), so after
+  //                       GAME_OVER_RESTART_MS reset stacks and deal afresh.
+  //
+  // While the uninterruptible deal countdown is running (or seating is being
+  // rearranged) both stay disarmed.
+  private refreshBetweenHandsTimers(): void {
+    const idle = this.dealCountdownDeadlineAt === null && !this.seatingRearrangeActive && this.isBetweenHands();
+    const canDeal = idle && this.canStartHand();
 
-  // Arms (once) a fixed GAME_OVER_RESTART_MS countdown when a hand has ended
-  // and fewer than 2 players still have chips to play with - i.e. the game
-  // itself is over, not just waiting between hands. Unlike autoDealDeadlineAt
-  // this never gets pushed back while it's counting down; it only clears
-  // once the game-over condition itself goes away (a hand actually starts,
-  // seating rearrange begins, etc).
-  private maybeScheduleGameOverRestart(): void {
-    const shouldBeArmed =
-      !this.seatingRearrangeActive &&
-      this.dealCountdownDeadlineAt === null &&
-      (this.phase === 'hand-complete' || this.phase === 'showdown') &&
-      !this.canStartHand() &&
-      this.players.size >= 2;
-    if (shouldBeArmed) {
+    this.autoDealDeadlineAt = canDeal ? Date.now() + this.settings.autoDealDelayMs : null;
+
+    // Unlike auto-deal, this one is armed once and then left alone, so an
+    // unrelated state change can't keep restarting the countdown.
+    if (idle && !canDeal && this.players.size >= 2) {
       if (this.gameOverRestartAt === null) {
         this.gameOverRestartAt = Date.now() + GAME_OVER_RESTART_MS;
       }
@@ -254,12 +235,22 @@ export class PokerRoom {
     }
   }
 
+  // Called by the server once autoDealDeadlineAt has passed. Re-validates
+  // everything since time may have moved the room on (someone dealt manually,
+  // started a seating rearrange, etc).
+  resolveAutoDeal(): void {
+    if (!this.isBetweenHands()) return;
+    if (this.seatingRearrangeActive) return;
+    if (!this.canStartHand()) return;
+    this.startHand();
+  }
+
   // Called by the server once gameOverRestartAt has passed. Re-validates
   // everything since time may have moved the room on. Resets every player's
   // stack back to the room's starting chips and deals a fresh game.
   resolveGameOverRestart(): void {
     if (this.gameOverRestartAt === null) return;
-    if (this.phase !== 'hand-complete' && this.phase !== 'showdown') return;
+    if (!this.isBetweenHands()) return;
     if (this.seatingRearrangeActive) return;
     if (this.canStartHand()) return;
     if (this.players.size < 2) return;
@@ -276,7 +267,7 @@ export class PokerRoom {
   // it's already counting down is a no-op.
   beginDealCountdown(): void {
     if (!this.canStartHand()) throw new PokerRuleError('Need at least 2 players with chips to start a hand');
-    if (this.phase !== 'lobby' && this.phase !== 'hand-complete' && this.phase !== 'showdown') {
+    if (this.phase !== 'lobby' && !this.isBetweenHands()) {
       throw new PokerRuleError('A hand is already in progress');
     }
     if (this.seatingRearrangeActive) throw new PokerRuleError('Cannot deal while rearranging seating');
@@ -291,7 +282,7 @@ export class PokerRoom {
   resolveDealCountdown(): void {
     if (this.dealCountdownDeadlineAt === null) return;
     this.dealCountdownDeadlineAt = null;
-    if (this.phase !== 'lobby' && this.phase !== 'hand-complete' && this.phase !== 'showdown') return;
+    if (this.phase !== 'lobby' && !this.isBetweenHands()) return;
     if (this.seatingRearrangeActive) return;
     if (!this.canStartHand()) return;
     this.startHand();
@@ -311,7 +302,7 @@ export class PokerRoom {
   // table after the hand is over (mirrors the automatic reveal non-folded
   // showdown players get in goToShowdown).
   revealCards(playerId: string): void {
-    if (this.phase !== 'showdown' && this.phase !== 'hand-complete') return;
+    if (!this.isBetweenHands()) return;
     const player = this.players.get(playerId);
     if (!player) return;
     if (!this.handPlayerIds.includes(playerId)) return;
@@ -325,14 +316,13 @@ export class PokerRoom {
   // ---------- Seating rearrangement ----------
 
   startSeatingRearrange(): void {
-    if (this.phase !== 'lobby' && this.phase !== 'hand-complete' && this.phase !== 'showdown') {
+    if (this.phase !== 'lobby' && !this.isBetweenHands()) {
       throw new PokerRuleError('Cannot rearrange seating mid-hand');
     }
     this.seatingRearrangeActive = true;
     this.seatingTapOrder = [];
     this.dealCountdownDeadlineAt = null; // cancels any pending locked deal countdown too
-    this.maybeScheduleAutoDeal(); // pauses the countdown while rearranging
-    this.maybeScheduleGameOverRestart();
+    this.refreshBetweenHandsTimers(); // pauses the countdowns while rearranging
   }
 
   tapSeatingOrder(playerId: string): void {
@@ -348,16 +338,14 @@ export class PokerRoom {
       });
       this.seatingRearrangeActive = false;
       this.seatingTapOrder = [];
-      this.maybeScheduleAutoDeal(); // resumes the countdown, fresh
-      this.maybeScheduleGameOverRestart();
+      this.refreshBetweenHandsTimers(); // resumes the countdown, fresh
     }
   }
 
   cancelSeatingRearrange(): void {
     this.seatingRearrangeActive = false;
     this.seatingTapOrder = [];
-    this.maybeScheduleAutoDeal();
-    this.maybeScheduleGameOverRestart();
+    this.refreshBetweenHandsTimers();
   }
 
   // ---------- Hand lifecycle ----------
@@ -366,12 +354,40 @@ export class PokerRoom {
     return this.seatOrder.map((id) => this.players.get(id)).filter((p): p is PlayerState => !!p);
   }
 
-  private eligibleForHand(): PlayerState[] {
-    return this.orderedSeatPlayers().filter((p) => p.chips > 0 && !p.isSittingOut);
+  // The PlayerState of everyone dealt into the current hand, in hand order.
+  // A player who leaves mid-hand stays in handPlayerIds but not in players,
+  // so unresolvable ids are simply dropped.
+  private handPlayers(): PlayerState[] {
+    return this.handPlayerIds.map((id) => this.players.get(id)).filter((p): p is PlayerState => !!p);
   }
 
+  // Every hand player's total chips in the middle - the single input both pot
+  // resolution and the live side-pot display are derived from.
+  private handContributions(): Contribution[] {
+    return this.handPlayers().map((p) => ({
+      playerId: p.id,
+      amount: p.totalHandContribution,
+      folded: p.folded,
+    }));
+  }
+
+  private static isEligible(p: PlayerState): boolean {
+    return p.chips > 0 && !p.isSittingOut;
+  }
+
+  private eligibleForHand(): PlayerState[] {
+    return this.orderedSeatPlayers().filter(PokerRoom.isEligible);
+  }
+
+  // Hot path: runs from refreshBetweenHandsTimers on every mutation and again
+  // from buildRoomView for each connected socket, so it counts in place rather
+  // than materialising the eligible list.
   canStartHand(): boolean {
-    return this.eligibleForHand().length >= 2;
+    let count = 0;
+    for (const p of this.players.values()) {
+      if (PokerRoom.isEligible(p) && ++count >= 2) return true;
+    }
+    return false;
   }
 
   startHand(): void {
@@ -592,9 +608,8 @@ export class PokerRoom {
   }
 
   private resetActedFlagsExcept(playerId: string): void {
-    for (const id of this.handPlayerIds) {
-      if (id === playerId) continue;
-      const p = this.players.get(id)!;
+    for (const p of this.handPlayers()) {
+      if (p.id === playerId) continue;
       if (!p.folded && !p.allIn) p.hasActedThisStreet = false;
     }
   }
@@ -612,8 +627,14 @@ export class PokerRoom {
   }
 
   private checkRoundOrHandProgress(): void {
-    const inHand = this.handPlayerIds.map((id) => this.players.get(id)!).filter((p) => p);
-    const notFolded = inHand.filter((p) => !p.folded);
+    // Only meaningful while a hand is actually being played. Between hands the
+    // pot has already been paid out, so re-running this would award it a second
+    // time, and advancePhaseAfterBetting has no street left to advance to - it
+    // would recurse until the stack blew. applyAction and forceFoldPlayer can
+    // never reach here outside a hand, but removePlayer can.
+    if (this.phase === 'lobby' || this.isBetweenHands()) return;
+
+    const notFolded = this.handPlayers().filter((p) => !p.folded);
 
     if (notFolded.length <= 1) {
       this.endHandByFold(notFolded[0] ?? null);
@@ -658,16 +679,15 @@ export class PokerRoom {
   }
 
   private advancePhaseAfterBetting(): void {
-    for (const id of this.handPlayerIds) {
-      const p = this.players.get(id)!;
+    const inHand = this.handPlayers();
+    for (const p of inHand) {
       p.currentStreetBet = 0;
       p.hasActedThisStreet = false;
     }
     this.currentBetLevel = 0;
     this.minRaise = this.settings.bigBlind;
 
-    const notFolded = this.handPlayerIds.map((id) => this.players.get(id)!).filter((p) => !p.folded);
-    const canStillAct = notFolded.filter((p) => !p.allIn).length >= 2;
+    const canStillAct = inHand.filter((p) => !p.folded && !p.allIn).length >= 2;
 
     const currentPhase = this.phase;
     let reachedRiver = false;
@@ -711,11 +731,7 @@ export class PokerRoom {
   }
 
   private endHandByFold(winner: PlayerState | null): void {
-    const contributions: Contribution[] = this.handPlayerIds.map((id) => {
-      const p = this.players.get(id)!;
-      return { playerId: id, amount: p.totalHandContribution, folded: p.folded };
-    });
-    const total = contributions.reduce((sum, c) => sum + c.amount, 0);
+    const total = this.handContributions().reduce((sum, c) => sum + c.amount, 0);
     if (winner) {
       winner.chips += total;
       this.potResults = [
@@ -731,15 +747,11 @@ export class PokerRoom {
     }
     this.phase = 'hand-complete';
     this.setCurrentTurn(null);
-    this.maybeScheduleAutoDeal();
-    this.maybeScheduleGameOverRestart();
+    this.refreshBetweenHandsTimers();
   }
 
   private goToShowdown(): void {
-    const contributions: Contribution[] = this.handPlayerIds.map((id) => {
-      const p = this.players.get(id)!;
-      return { playerId: id, amount: p.totalHandContribution, folded: p.folded };
-    });
+    const contributions = this.handContributions();
 
     const uncalled = computeUncalledReturn(contributions);
     if (uncalled) {
@@ -750,15 +762,18 @@ export class PokerRoom {
     }
 
     const pots = computePots(contributions);
-    const showdownPlayers = this.handPlayerIds
-      .map((id) => this.players.get(id)!)
-      .filter((p) => !p.folded);
+    const showdownPlayers = this.handPlayers().filter((p) => !p.folded);
 
     for (const p of showdownPlayers) p.revealedAtShowdown = true;
 
     const scores = new Map(
       showdownPlayers.map((p) => [p.id, evaluateBestHand([...p.holeCards, ...this.communityCards])])
     );
+
+    // Odd chips go to winners in seat order starting left of the dealer.
+    const seatCount = Math.max(1, this.seatOrder.length);
+    const seatsFromDealer = (seat: number) =>
+      (((seat - (this.dealerSeat ?? 0) - 1) % seatCount) + seatCount) % seatCount;
 
     const results: PotResult[] = pots.map((pot) => {
       const eligible = pot.eligiblePlayerIds.filter((id) => scores.has(id));
@@ -771,14 +786,9 @@ export class PokerRoom {
       const share = Math.floor(pot.amount / winnerIds.length);
       let remainder = pot.amount - share * winnerIds.length;
 
-      // Odd chips go to winners in seat order starting left of the dealer.
       const orderedWinners = winnerIds
         .map((id) => this.players.get(id)!)
-        .sort((a, b) => {
-          const da = ((a.seat - (this.dealerSeat ?? 0) - 1 + 10000) % 10000);
-          const db = ((b.seat - (this.dealerSeat ?? 0) - 1 + 10000) % 10000);
-          return da - db;
-        });
+        .sort((a, b) => seatsFromDealer(a.seat) - seatsFromDealer(b.seat));
 
       const winners = orderedWinners.map((p) => {
         let amount = share;
@@ -796,8 +806,7 @@ export class PokerRoom {
     this.potResults = results;
     this.phase = 'showdown';
     this.setCurrentTurn(null);
-    this.maybeScheduleAutoDeal();
-    this.maybeScheduleGameOverRestart();
+    this.refreshBetweenHandsTimers();
   }
 
   // ---------- Snapshot ----------
@@ -807,24 +816,15 @@ export class PokerRoom {
   // a side-pot situation and shouldn't be displayed as one. Only decompose
   // into main/side pots once someone is genuinely all-in for less than others.
   private livePots(): Pot[] {
-    if (this.phase === 'lobby' || this.phase === 'hand-complete' || this.phase === 'showdown') return [];
-    if (this.handPlayerIds.length === 0) return [];
+    if (this.phase === 'lobby' || this.isBetweenHands()) return [];
 
-    const contributions = this.handPlayerIds.map((id) => {
-      const p = this.players.get(id)!;
-      return { playerId: id, amount: p.totalHandContribution, folded: p.folded };
-    });
+    const contributions = this.handContributions();
     const total = contributions.reduce((sum, c) => sum + c.amount, 0);
     if (total === 0) return [];
 
-    const anyAllIn = this.handPlayerIds.some((id) => {
-      const p = this.players.get(id)!;
-      return !p.folded && p.allIn;
-    });
-
-    if (!anyAllIn) {
-      const eligiblePlayerIds = this.handPlayerIds.filter((id) => !this.players.get(id)!.folded);
-      return [{ amount: total, eligiblePlayerIds, label: 'Pot' }];
+    const live = this.handPlayers().filter((p) => !p.folded);
+    if (!live.some((p) => p.allIn)) {
+      return [{ amount: total, eligiblePlayerIds: live.map((p) => p.id), label: 'Pot' }];
     }
 
     return computePots(contributions);

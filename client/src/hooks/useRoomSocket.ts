@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChipsAwardEvent, ChipsBetEvent, ErrorPayload, RoomView, SOCKET_EVENTS } from '@sylhet/shared';
 import { getSocket } from '../socket';
 
@@ -57,9 +57,11 @@ export function useRoomSocket() {
     };
   }, []);
 
-  function dismissChipFx(key: string) {
+  // Stable identity: callers put this in effect dependency arrays, and a new
+  // function each render would restart those effects on every room update.
+  const dismissChipFx = useCallback((key: string) => {
     setChipFx((prev) => prev.filter((e) => e.key !== key));
-  }
+  }, []);
 
   return { view, error, setError, connected, chipFx, dismissChipFx };
 }

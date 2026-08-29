@@ -13,7 +13,7 @@ import { RoomQrPanel } from '../components/RoomQrPanel';
 import { FeltColorPicker } from '../components/FeltColorPicker';
 import { BlindsForm } from '../components/BlindsForm';
 import { TimingForm } from '../components/TimingForm';
-import { AutoDealCountdown } from '../components/AutoDealCountdown';
+import { DealControls } from '../components/DealControls';
 import { darken } from '../colorUtils';
 import './TableScreen.css';
 
@@ -161,29 +161,14 @@ export default function TableScreen() {
       </div>
 
       <div className="table-bottombar">
-        {view.players.length < 2 ? (
-          <div className="table-waiting">Waiting for at least 2 players to join…</div>
-        ) : view.dealCountdownDeadlineAt ? (
-          <div className="table-deal-stack">
-            <AutoDealCountdown deadlineAt={null} lockedDeadlineAt={view.dealCountdownDeadlineAt} />
-          </div>
-        ) : view.canStartHand ? (
-          <div className="table-deal-stack">
-            <button className="btn btn-primary btn-big" onClick={() => emitWithAck(SOCKET_EVENTS.TABLE_START_HAND).catch(() => {})}>
-              {view.handNumber === 0 ? 'Deal First Hand' : 'Deal Next Hand'}
-            </button>
-            <AutoDealCountdown deadlineAt={view.autoDealDeadlineAt} />
-          </div>
-        ) : view.gameOverRestartAt ? (
-          <div className="table-hand-status">
-            <div>Game over</div>
-            <AutoDealCountdown deadlineAt={view.gameOverRestartAt} label="New game in" />
-          </div>
-        ) : (
-          <div className="table-hand-status">
-            Hand #{view.handNumber} — {view.phase.toUpperCase()}
-          </div>
-        )}
+        <DealControls
+          view={view}
+          fallback={
+            <div className="table-hand-status">
+              Hand #{view.handNumber} — {view.phase.toUpperCase()}
+            </div>
+          }
+        />
       </div>
 
       {error && (
