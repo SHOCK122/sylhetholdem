@@ -50,5 +50,6 @@ Three workspaces, dependency order `shared → server` and `shared → client`:
 
 ## Git workflow
 
-- Agents should not work directly on `main`. At the start of a task, create (or switch to) a feature branch for that task's changes and commit there, rather than committing to `main`.
-- When the user explicitly asks for a commit to `main`: only stage and commit the changes made in the current conversation thread. Do not stage or ask about other unrelated uncommitted changes sitting in the working tree — leave them as they are. After committing, push to `origin` if that remote exists, without asking for separate confirmation.
+- Agents should not work directly on `main`. At the start of a task, create (or switch to) a feature branch for that task's changes and commit there.
+- Only stage and commit the changes made in the current conversation thread. Do not stage or ask about other unrelated uncommitted changes sitting in the working tree — leave them as they are.
+- Once a feature branch's changes are complete, merge it into `main` automatically — no separate confirmation needed. Push `main` (and the feature branch, if it has its own upstream) to `origin` if that remote exists, without asking for separate confirmation.
