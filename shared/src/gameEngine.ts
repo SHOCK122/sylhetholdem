@@ -2,6 +2,7 @@ import {
   Card,
   DEAL_COUNTDOWN_MS,
   EXTEND_TURN_MS,
+  GAME_OVER_RESTART_MS,
   GamePhase,
   GameSettings,
   PlayerAction,
@@ -66,6 +67,9 @@ export class PokerRoom {
   // Set once someone commits to dealing (via startHand's caller) - a fixed,
   // uninterruptible countdown that nothing (not even card touches) resets.
   dealCountdownDeadlineAt: number | null = null;
+  // Set once a hand ends leaving fewer than 2 players with chips (the game
+  // is over) - see maybeScheduleGameOverRestart.
+  gameOverRestartAt: number | null = null;
   currentBetLevel = 0;
   minRaise = 0;
   lastAggressorId: string | null = null;
@@ -96,6 +100,7 @@ export class PokerRoom {
     this.players.set(id, player);
     this.seatOrder.push(id);
     this.maybeScheduleAutoDeal(); // a new player may push an idle room back over the 2-player minimum
+    this.maybeScheduleGameOverRestart();
     return player;
   }
 
@@ -116,6 +121,7 @@ export class PokerRoom {
       this.checkRoundOrHandProgress();
     }
     this.maybeScheduleAutoDeal();
+    this.maybeScheduleGameOverRestart();
   }
 
   setConnected(id: string, connected: boolean): void {
@@ -196,6 +202,7 @@ export class PokerRoom {
       this.settings.autoDealDelayMs = autoDealDelayMs;
     }
     this.maybeScheduleAutoDeal();
+    this.maybeScheduleGameOverRestart();
   }
 
   // Arms (or disarms) the auto-deal countdown based on current state. Called
@@ -225,6 +232,44 @@ export class PokerRoom {
     this.startHand();
   }
 
+  // Arms (once) a fixed GAME_OVER_RESTART_MS countdown when a hand has ended
+  // and fewer than 2 players still have chips to play with - i.e. the game
+  // itself is over, not just waiting between hands. Unlike autoDealDeadlineAt
+  // this never gets pushed back while it's counting down; it only clears
+  // once the game-over condition itself goes away (a hand actually starts,
+  // seating rearrange begins, etc).
+  private maybeScheduleGameOverRestart(): void {
+    const shouldBeArmed =
+      !this.seatingRearrangeActive &&
+      this.dealCountdownDeadlineAt === null &&
+      (this.phase === 'hand-complete' || this.phase === 'showdown') &&
+      !this.canStartHand() &&
+      this.players.size >= 2;
+    if (shouldBeArmed) {
+      if (this.gameOverRestartAt === null) {
+        this.gameOverRestartAt = Date.now() + GAME_OVER_RESTART_MS;
+      }
+    } else {
+      this.gameOverRestartAt = null;
+    }
+  }
+
+  // Called by the server once gameOverRestartAt has passed. Re-validates
+  // everything since time may have moved the room on. Resets every player's
+  // stack back to the room's starting chips and deals a fresh game.
+  resolveGameOverRestart(): void {
+    if (this.gameOverRestartAt === null) return;
+    if (this.phase !== 'hand-complete' && this.phase !== 'showdown') return;
+    if (this.seatingRearrangeActive) return;
+    if (this.canStartHand()) return;
+    if (this.players.size < 2) return;
+    this.gameOverRestartAt = null;
+    for (const p of this.players.values()) {
+      p.chips = this.settings.startingChips;
+    }
+    this.startHand();
+  }
+
   // Called when someone actually clicks the deal button: rather than dealing
   // immediately, arms a fixed DEAL_COUNTDOWN_MS countdown that nothing can
   // interrupt or push back (unlike autoDealDeadlineAt). A repeat click while
@@ -238,6 +283,7 @@ export class PokerRoom {
     if (this.dealCountdownDeadlineAt !== null) return;
     this.dealCountdownDeadlineAt = Date.now() + DEAL_COUNTDOWN_MS;
     this.autoDealDeadlineAt = null;
+    this.gameOverRestartAt = null;
   }
 
   // Called by the server once dealCountdownDeadlineAt has passed. Re-validates
@@ -286,6 +332,7 @@ export class PokerRoom {
     this.seatingTapOrder = [];
     this.dealCountdownDeadlineAt = null; // cancels any pending locked deal countdown too
     this.maybeScheduleAutoDeal(); // pauses the countdown while rearranging
+    this.maybeScheduleGameOverRestart();
   }
 
   tapSeatingOrder(playerId: string): void {
@@ -302,6 +349,7 @@ export class PokerRoom {
       this.seatingRearrangeActive = false;
       this.seatingTapOrder = [];
       this.maybeScheduleAutoDeal(); // resumes the countdown, fresh
+      this.maybeScheduleGameOverRestart();
     }
   }
 
@@ -309,6 +357,7 @@ export class PokerRoom {
     this.seatingRearrangeActive = false;
     this.seatingTapOrder = [];
     this.maybeScheduleAutoDeal();
+    this.maybeScheduleGameOverRestart();
   }
 
   // ---------- Hand lifecycle ----------
@@ -333,6 +382,7 @@ export class PokerRoom {
 
     this.autoDealDeadlineAt = null;
     this.dealCountdownDeadlineAt = null;
+    this.gameOverRestartAt = null;
 
     const eligible = this.eligibleForHand();
     for (const p of this.players.values()) {
@@ -682,6 +732,7 @@ export class PokerRoom {
     this.phase = 'hand-complete';
     this.setCurrentTurn(null);
     this.maybeScheduleAutoDeal();
+    this.maybeScheduleGameOverRestart();
   }
 
   private goToShowdown(): void {
@@ -746,6 +797,7 @@ export class PokerRoom {
     this.phase = 'showdown';
     this.setCurrentTurn(null);
     this.maybeScheduleAutoDeal();
+    this.maybeScheduleGameOverRestart();
   }
 
   // ---------- Snapshot ----------
@@ -797,6 +849,7 @@ export class PokerRoom {
       turnDeadlineAt: this.turnDeadlineAt,
       autoDealDeadlineAt: this.autoDealDeadlineAt,
       dealCountdownDeadlineAt: this.dealCountdownDeadlineAt,
+      gameOverRestartAt: this.gameOverRestartAt,
       currentBetLevel: this.currentBetLevel,
       minRaise: this.minRaise,
       seatingRearrangeActive: this.seatingRearrangeActive,

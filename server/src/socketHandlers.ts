@@ -52,6 +52,7 @@ export function registerSocketHandlers(io: Server) {
   const turnTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const autoDealTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const dealCountdownTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const gameOverTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   function scheduleTurnTimer(roomCode: string) {
     const existing = turnTimers.get(roomCode);
@@ -119,6 +120,28 @@ export function registerSocketHandlers(io: Server) {
     dealCountdownTimers.set(roomCode, handle);
   }
 
+  function scheduleGameOverTimer(roomCode: string) {
+    const existing = gameOverTimers.get(roomCode);
+    if (existing) clearTimeout(existing);
+    gameOverTimers.delete(roomCode);
+
+    const entry = getRoom(roomCode);
+    if (!entry) return;
+    const deadline = entry.room.gameOverRestartAt;
+    if (deadline === null) return;
+
+    const delay = Math.max(0, deadline - Date.now());
+    const handle = setTimeout(() => {
+      gameOverTimers.delete(roomCode);
+      const liveEntry = getRoom(roomCode);
+      if (!liveEntry) return;
+      // Defensive re-check: state may have moved on between scheduling and firing.
+      if (liveEntry.room.gameOverRestartAt !== deadline) return;
+      runMutation(roomCode, liveEntry, () => liveEntry.room.resolveGameOverRestart());
+    }, delay);
+    gameOverTimers.set(roomCode, handle);
+  }
+
   function broadcastRoom(roomCode: string) {
     const entry = getRoom(roomCode);
     if (!entry) return;
@@ -135,6 +158,7 @@ export function registerSocketHandlers(io: Server) {
     scheduleTurnTimer(roomCode);
     scheduleAutoDealTimer(roomCode);
     scheduleDealCountdownTimer(roomCode);
+    scheduleGameOverTimer(roomCode);
   }
 
   function runMutation(roomCode: string, entry: RoomEntry, mutate: () => void, socket?: Socket) {

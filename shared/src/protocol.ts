@@ -47,6 +47,7 @@ export interface RoomView {
   turnDeadlineAt: number | null;
   autoDealDeadlineAt: number | null;
   dealCountdownDeadlineAt: number | null;
+  gameOverRestartAt: number | null;
   currentBetLevel: number;
   minRaise: number;
   seatingRearrangeActive: boolean;

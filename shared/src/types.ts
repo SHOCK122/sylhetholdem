@@ -79,6 +79,10 @@ export const DEFAULT_AUTO_DEAL_MS = 15_000;
 // hand starts after this fixed, uninterruptible countdown - unlike
 // autoDealDeadlineAt, nothing (including PLAYER_TOUCH_CARDS) can push it back.
 export const DEAL_COUNTDOWN_MS = 5_000;
+// When a hand ends and fewer than 2 players still have chips (the game is
+// over), the room waits this long before resetting everyone's stack to
+// startingChips and dealing a fresh game.
+export const GAME_OVER_RESTART_MS = 60_000;
 
 export interface GameSettings {
   smallBlind: number;
@@ -108,6 +112,7 @@ export interface RoomStateSnapshot {
   turnDeadlineAt: number | null;
   autoDealDeadlineAt: number | null;
   dealCountdownDeadlineAt: number | null;
+  gameOverRestartAt: number | null;
   currentBetLevel: number;
   minRaise: number;
   seatingRearrangeActive: boolean;
