@@ -75,6 +75,10 @@ export const DEFAULT_TURN_MS = 20_000;
 export const QUICK_CHECK_FOLD_MS = 5_000;
 export const EXTEND_TURN_MS = 10_000;
 export const DEFAULT_AUTO_DEAL_MS = 15_000;
+// Once someone actually commits to dealing (via the deal button), the next
+// hand starts after this fixed, uninterruptible countdown - unlike
+// autoDealDeadlineAt, nothing (including PLAYER_TOUCH_CARDS) can push it back.
+export const DEAL_COUNTDOWN_MS = 5_000;
 
 export interface GameSettings {
   smallBlind: number;
@@ -103,6 +107,7 @@ export interface RoomStateSnapshot {
   currentTurnPlayerId: string | null;
   turnDeadlineAt: number | null;
   autoDealDeadlineAt: number | null;
+  dealCountdownDeadlineAt: number | null;
   currentBetLevel: number;
   minRaise: number;
   seatingRearrangeActive: boolean;

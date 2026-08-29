@@ -129,6 +129,12 @@
   color: #e0c86e;
 }
 
+.player-board-toggle {
+  display: flex;
+  justify-content: center;
+  padding: 0.3rem 0 0;
+}
+
 .player-board {
   display: flex;
   flex-direction: column;

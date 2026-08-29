@@ -219,6 +219,19 @@ input {
   font-weight: 600;
 }
 
+.auto-deal-countdown-locked {
+  color: var(--gold);
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  animation: locked-countdown-pulse 1s ease-in-out infinite;
+}
+
+@keyframes locked-countdown-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
 @keyframes card-deal-in {
   0% {
     opacity: 0;

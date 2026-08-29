@@ -20,6 +20,7 @@ export interface PublicPlayerView {
   lastAction: PlayerAction | null;
   handDescription?: string;
   autoCheckFold: boolean;
+  revealedAtShowdown: boolean;
 }
 
 export interface ValidActionsInfo {
@@ -45,6 +46,7 @@ export interface RoomView {
   currentTurnPlayerId: string | null;
   turnDeadlineAt: number | null;
   autoDealDeadlineAt: number | null;
+  dealCountdownDeadlineAt: number | null;
   currentBetLevel: number;
   minRaise: number;
   seatingRearrangeActive: boolean;
@@ -156,6 +158,8 @@ export const SOCKET_EVENTS = {
   PLAYER_SEATING_TAP: 'player:seatingTap',
   PLAYER_EXTEND_TIMER: 'player:extendTimer',
   PLAYER_SET_AUTO_CHECK_FOLD: 'player:setAutoCheckFold',
+  PLAYER_TOUCH_CARDS: 'player:touchCards',
+  PLAYER_REVEAL_CARDS: 'player:revealCards',
 
   ROOM_VIEW: 'room:view',
   ROOM_ERROR: 'room:error',

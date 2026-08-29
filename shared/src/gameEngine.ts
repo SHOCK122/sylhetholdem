@@ -1,5 +1,6 @@
 import {
   Card,
+  DEAL_COUNTDOWN_MS,
   EXTEND_TURN_MS,
   GamePhase,
   GameSettings,
@@ -62,6 +63,9 @@ export class PokerRoom {
   currentTurnPlayerId: string | null = null;
   turnDeadlineAt: number | null = null;
   autoDealDeadlineAt: number | null = null;
+  // Set once someone commits to dealing (via startHand's caller) - a fixed,
+  // uninterruptible countdown that nothing (not even card touches) resets.
+  dealCountdownDeadlineAt: number | null = null;
   currentBetLevel = 0;
   minRaise = 0;
   lastAggressorId: string | null = null;
@@ -197,8 +201,13 @@ export class PokerRoom {
   // Arms (or disarms) the auto-deal countdown based on current state. Called
   // whenever something could change whether a deal should be pending: a hand
   // ending, seating rearrange starting/finishing, or the delay setting itself
-  // changing.
+  // changing. Once the uninterruptible deal countdown has taken over
+  // (dealCountdownDeadlineAt set), the idle auto-deal countdown stays disarmed.
   private maybeScheduleAutoDeal(): void {
+    if (this.dealCountdownDeadlineAt !== null) {
+      this.autoDealDeadlineAt = null;
+      return;
+    }
     if (!this.seatingRearrangeActive && (this.phase === 'hand-complete' || this.phase === 'showdown') && this.canStartHand()) {
       this.autoDealDeadlineAt = Date.now() + this.settings.autoDealDelayMs;
     } else {
@@ -216,6 +225,57 @@ export class PokerRoom {
     this.startHand();
   }
 
+  // Called when someone actually clicks the deal button: rather than dealing
+  // immediately, arms a fixed DEAL_COUNTDOWN_MS countdown that nothing can
+  // interrupt or push back (unlike autoDealDeadlineAt). A repeat click while
+  // it's already counting down is a no-op.
+  beginDealCountdown(): void {
+    if (!this.canStartHand()) throw new PokerRuleError('Need at least 2 players with chips to start a hand');
+    if (this.phase !== 'lobby' && this.phase !== 'hand-complete' && this.phase !== 'showdown') {
+      throw new PokerRuleError('A hand is already in progress');
+    }
+    if (this.seatingRearrangeActive) throw new PokerRuleError('Cannot deal while rearranging seating');
+    if (this.dealCountdownDeadlineAt !== null) return;
+    this.dealCountdownDeadlineAt = Date.now() + DEAL_COUNTDOWN_MS;
+    this.autoDealDeadlineAt = null;
+  }
+
+  // Called by the server once dealCountdownDeadlineAt has passed. Re-validates
+  // everything (never throws) since time may have moved the room on.
+  resolveDealCountdown(): void {
+    if (this.dealCountdownDeadlineAt === null) return;
+    this.dealCountdownDeadlineAt = null;
+    if (this.phase !== 'lobby' && this.phase !== 'hand-complete' && this.phase !== 'showdown') return;
+    if (this.seatingRearrangeActive) return;
+    if (!this.canStartHand()) return;
+    this.startHand();
+  }
+
+  // Any touch, drag, or reveal of a player's hole cards between hands pushes
+  // the idle auto-deal countdown back out - but never the locked
+  // dealCountdownDeadlineAt, which is intentionally uninterruptible.
+  touchCards(playerId: string): void {
+    if (!this.players.has(playerId)) return;
+    if (this.autoDealDeadlineAt !== null) {
+      this.autoDealDeadlineAt = Date.now() + this.settings.autoDealDelayMs;
+    }
+  }
+
+  // Lets a folded player voluntarily show their hole cards to the whole
+  // table after the hand is over (mirrors the automatic reveal non-folded
+  // showdown players get in goToShowdown).
+  revealCards(playerId: string): void {
+    if (this.phase !== 'showdown' && this.phase !== 'hand-complete') return;
+    const player = this.players.get(playerId);
+    if (!player) return;
+    if (!this.handPlayerIds.includes(playerId)) return;
+    if (!player.folded) return;
+    if (player.revealedAtShowdown) return;
+    if (player.holeCards.length === 0) return;
+    player.revealedAtShowdown = true;
+    this.touchCards(playerId);
+  }
+
   // ---------- Seating rearrangement ----------
 
   startSeatingRearrange(): void {
@@ -224,6 +284,7 @@ export class PokerRoom {
     }
     this.seatingRearrangeActive = true;
     this.seatingTapOrder = [];
+    this.dealCountdownDeadlineAt = null; // cancels any pending locked deal countdown too
     this.maybeScheduleAutoDeal(); // pauses the countdown while rearranging
   }
 
@@ -271,6 +332,7 @@ export class PokerRoom {
     }
 
     this.autoDealDeadlineAt = null;
+    this.dealCountdownDeadlineAt = null;
 
     const eligible = this.eligibleForHand();
     for (const p of this.players.values()) {
@@ -734,6 +796,7 @@ export class PokerRoom {
       currentTurnPlayerId: this.currentTurnPlayerId,
       turnDeadlineAt: this.turnDeadlineAt,
       autoDealDeadlineAt: this.autoDealDeadlineAt,
+      dealCountdownDeadlineAt: this.dealCountdownDeadlineAt,
       currentBetLevel: this.currentBetLevel,
       minRaise: this.minRaise,
       seatingRearrangeActive: this.seatingRearrangeActive,

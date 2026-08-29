@@ -1,3 +1,9 @@
+.hole-cards-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
 .hole-cards {
   position: relative;
   display: flex;
@@ -7,10 +13,21 @@
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  cursor: grab;
+}
+
+.hole-cards-dragging {
+  cursor: grabbing;
+  transition: none;
 }
 
 .hole-card-slot {
   width: clamp(80px, 26vw, 120px);
+  transition: width 0.2s ease;
+}
+
+.hole-cards-large .hole-card-slot {
+  width: clamp(110px, 40vw, 190px);
 }
 
 .hole-card-slot svg {
@@ -32,4 +49,15 @@
   text-align: center;
   font-size: 0.68rem;
   color: var(--text-dim);
+}
+
+.hole-cards-reveal-btn {
+  margin-top: 1.3rem;
+}
+
+.hole-cards-shown-tag {
+  font-size: 0.72rem;
+  color: var(--gold);
+  font-weight: 700;
+  margin-top: 1.3rem;
 }

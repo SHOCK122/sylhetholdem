@@ -28,6 +28,7 @@ export default function PlayerScreen() {
   const [showBetSelector, setShowBetSelector] = useState<'bet' | 'raise' | null>(null);
   const [showTableControls, setShowTableControls] = useState(false);
   const [showQr, setShowQr] = useState(false);
+  const [showBoard, setShowBoard] = useState(false);
   const auth = useMemo(() => (roomCode ? loadPlayerAuth(roomCode) : null), [roomCode]);
   const qrButtonRef = useRef<HTMLButtonElement>(null);
   const qrPanelRef = useRef<HTMLDivElement>(null);
@@ -89,10 +90,25 @@ export default function PlayerScreen() {
   const isMyTurn = !!me?.isTurn && !!va && va.actions.length > 0;
   const potTotal = view.pots.reduce((s, p) => s + p.amount, 0);
   const joinUrl = `${window.location.origin}/join/${view.roomCode}`;
+  const boardHidden = view.hasTable && !showBoard;
 
   function doAction(action: PlayerAction) {
     emitWithAck(SOCKET_EVENTS.PLAYER_ACTION, { action }).catch(() => {});
     setShowBetSelector(null);
+  }
+
+  const handEnded = view.phase === 'showdown' || view.phase === 'hand-complete';
+  const forceCardsRevealed = !!me && ((handEnded && !me.folded) || me.revealedAtShowdown);
+  const canRevealCards = !!me && me.folded && handEnded && !me.revealedAtShowdown;
+
+  function touchCards() {
+    if (view!.autoDealDeadlineAt != null) {
+      emitWithAck(SOCKET_EVENTS.PLAYER_TOUCH_CARDS).catch(() => {});
+    }
+  }
+
+  function revealCards() {
+    emitWithAck(SOCKET_EVENTS.PLAYER_REVEAL_CARDS).catch(() => {});
   }
 
   const showSeatingOverlay = view.seatingRearrangeActive && !view.seatingTapOrder.includes(auth.playerId);
@@ -157,17 +173,27 @@ export default function PlayerScreen() {
         ))}
       </div>
 
-      <div className="player-board">
-        <CommunityBoard cards={view.communityCards} burnCount={view.burnCount} />
-        {potTotal > 0 && (
-          <div className="player-pot" key={potTotal}>
-            <ChipStack amount={potTotal} size={20} compact />
-            <span>
-              Pot: <strong>{potTotal.toLocaleString()}</strong>
-            </span>
-          </div>
-        )}
-      </div>
+      {view.hasTable && (
+        <div className="player-board-toggle">
+          <button className="btn btn-ghost btn-sm" onClick={() => setShowBoard((v) => !v)}>
+            {showBoard ? 'Hide Board & Pot' : 'Show Board & Pot'}
+          </button>
+        </div>
+      )}
+
+      {!boardHidden && (
+        <div className="player-board">
+          <CommunityBoard cards={view.communityCards} burnCount={view.burnCount} />
+          {potTotal > 0 && (
+            <div className="player-pot" key={potTotal}>
+              <ChipStack amount={potTotal} size={20} compact />
+              <span>
+                Pot: <strong>{potTotal.toLocaleString()}</strong>
+              </span>
+            </div>
+          )}
+        </div>
+      )}
 
       {(view.phase === 'showdown' || view.phase === 'hand-complete') && view.potResults && view.potResults.length > 0 && (
         <div className="player-result-banner">
@@ -188,7 +214,15 @@ export default function PlayerScreen() {
           <ChipPile amount={me?.chips ?? 0} size={18} />
           <span className="player-self-chips">{(me?.chips ?? 0).toLocaleString()} chips</span>
         </div>
-        <HoleCards cards={me?.holeCards ?? null} />
+        <HoleCards
+          cards={me?.holeCards ?? null}
+          large={boardHidden}
+          handNumber={view.handNumber}
+          forceRevealed={forceCardsRevealed}
+          canReveal={canRevealCards}
+          onTouch={touchCards}
+          onReveal={revealCards}
+        />
         {me && me.currentStreetBet > 0 && (
           <div className="player-self-bet">
             <ChipStack amount={me.currentStreetBet} size={24} compact />
@@ -273,6 +307,8 @@ export default function PlayerScreen() {
         <div className="player-tableless-deal">
           {view.players.length < 2 ? (
             <div className="table-waiting">Waiting for at least 2 players to join…</div>
+          ) : view.dealCountdownDeadlineAt ? (
+            <AutoDealCountdown deadlineAt={null} lockedDeadlineAt={view.dealCountdownDeadlineAt} />
           ) : view.canStartHand ? (
             <div className="table-deal-stack">
               <button className="btn btn-primary btn-big" onClick={() => emitWithAck(SOCKET_EVENTS.TABLE_START_HAND).catch(() => {})}>
@@ -285,7 +321,7 @@ export default function PlayerScreen() {
       )}
 
       {view.hasTable && (
-        <AutoDealCountdown deadlineAt={view.autoDealDeadlineAt} />
+        <AutoDealCountdown deadlineAt={view.autoDealDeadlineAt} lockedDeadlineAt={view.dealCountdownDeadlineAt} />
       )}
 
       {showSeatingOverlay && (

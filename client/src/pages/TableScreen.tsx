@@ -163,6 +163,10 @@ export default function TableScreen() {
       <div className="table-bottombar">
         {view.players.length < 2 ? (
           <div className="table-waiting">Waiting for at least 2 players to join…</div>
+        ) : view.dealCountdownDeadlineAt ? (
+          <div className="table-deal-stack">
+            <AutoDealCountdown deadlineAt={null} lockedDeadlineAt={view.dealCountdownDeadlineAt} />
+          </div>
         ) : view.canStartHand ? (
           <div className="table-deal-stack">
             <button className="btn btn-primary btn-big" onClick={() => emitWithAck(SOCKET_EVENTS.TABLE_START_HAND).catch(() => {})}>

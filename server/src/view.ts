@@ -30,11 +30,12 @@ export function buildRoomView(
       isDealer: snapshot.dealerSeat === p.seat,
       isSmallBlind: snapshot.smallBlindSeat === p.seat,
       isBigBlind: snapshot.bigBlindSeat === p.seat,
-      holeCardCount: p.folded ? 0 : p.holeCards.length,
+      holeCardCount: p.folded && !p.revealedAtShowdown ? 0 : p.holeCards.length,
       holeCards: showCards ? p.holeCards : null,
       lastAction: p.lastAction,
       handDescription,
       autoCheckFold: p.autoCheckFold,
+      revealedAtShowdown: p.revealedAtShowdown,
     };
   });
 
@@ -54,6 +55,7 @@ export function buildRoomView(
     currentTurnPlayerId: snapshot.currentTurnPlayerId,
     turnDeadlineAt: snapshot.turnDeadlineAt,
     autoDealDeadlineAt: snapshot.autoDealDeadlineAt,
+    dealCountdownDeadlineAt: snapshot.dealCountdownDeadlineAt,
     currentBetLevel: snapshot.currentBetLevel,
     minRaise: snapshot.minRaise,
     seatingRearrangeActive: snapshot.seatingRearrangeActive,

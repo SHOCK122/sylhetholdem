@@ -51,6 +51,7 @@ function joinPlayerToRoom(
 export function registerSocketHandlers(io: Server) {
   const turnTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const autoDealTimers = new Map<string, ReturnType<typeof setTimeout>>();
+  const dealCountdownTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
   function scheduleTurnTimer(roomCode: string) {
     const existing = turnTimers.get(roomCode);
@@ -96,6 +97,28 @@ export function registerSocketHandlers(io: Server) {
     autoDealTimers.set(roomCode, handle);
   }
 
+  function scheduleDealCountdownTimer(roomCode: string) {
+    const existing = dealCountdownTimers.get(roomCode);
+    if (existing) clearTimeout(existing);
+    dealCountdownTimers.delete(roomCode);
+
+    const entry = getRoom(roomCode);
+    if (!entry) return;
+    const deadline = entry.room.dealCountdownDeadlineAt;
+    if (deadline === null) return;
+
+    const delay = Math.max(0, deadline - Date.now());
+    const handle = setTimeout(() => {
+      dealCountdownTimers.delete(roomCode);
+      const liveEntry = getRoom(roomCode);
+      if (!liveEntry) return;
+      // Defensive re-check: state may have moved on between scheduling and firing.
+      if (liveEntry.room.dealCountdownDeadlineAt !== deadline) return;
+      runMutation(roomCode, liveEntry, () => liveEntry.room.resolveDealCountdown());
+    }, delay);
+    dealCountdownTimers.set(roomCode, handle);
+  }
+
   function broadcastRoom(roomCode: string) {
     const entry = getRoom(roomCode);
     if (!entry) return;
@@ -111,6 +134,7 @@ export function registerSocketHandlers(io: Server) {
     }
     scheduleTurnTimer(roomCode);
     scheduleAutoDealTimer(roomCode);
+    scheduleDealCountdownTimer(roomCode);
   }
 
   function runMutation(roomCode: string, entry: RoomEntry, mutate: () => void, socket?: Socket) {
@@ -238,7 +262,7 @@ export function registerSocketHandlers(io: Server) {
 
     socket.on(SOCKET_EVENTS.TABLE_START_HAND, () => {
       requireController(socket, (roomCode, entry) => {
-        runMutation(roomCode, entry, () => entry.room.startHand(), socket);
+        runMutation(roomCode, entry, () => entry.room.beginDealCountdown(), socket);
       });
     });
 
@@ -275,6 +299,18 @@ export function registerSocketHandlers(io: Server) {
     socket.on(SOCKET_EVENTS.PLAYER_SET_AUTO_CHECK_FOLD, (payload: SetAutoCheckFoldPayload) => {
       requirePlayer(socket, (roomCode, entry, playerId) => {
         runMutation(roomCode, entry, () => entry.room.setAutoCheckFold(playerId, !!payload?.enabled));
+      });
+    });
+
+    socket.on(SOCKET_EVENTS.PLAYER_TOUCH_CARDS, () => {
+      requirePlayer(socket, (roomCode, entry, playerId) => {
+        runMutation(roomCode, entry, () => entry.room.touchCards(playerId));
+      });
+    });
+
+    socket.on(SOCKET_EVENTS.PLAYER_REVEAL_CARDS, () => {
+      requirePlayer(socket, (roomCode, entry, playerId) => {
+        runMutation(roomCode, entry, () => entry.room.revealCards(playerId));
       });
     });
 
