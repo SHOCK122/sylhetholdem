@@ -1,12 +1,16 @@
 import { Card, RANK_LABELS, SUIT_SYMBOLS } from '@sylhet/shared';
 
 // Row y-positions are spread evenly across a 0.16-0.87 band. That band isn't
-// arbitrary: with dominant-baseline="middle" text at the doubled pip font
-// size, measured glyph boxes extend ~47px above and ~36px below their
+// arbitrary: with dominant-baseline="middle" text at the pip font size
+// below (36), measured glyph boxes extend ~24px above and ~16px below their
 // nominal y - so the outermost rows need that much clearance from the card's
-// top/bottom edges (y=2 / y=334 in the 240x336 viewBox) or they clip. Each
-// rank keeps its original pip's upright/rotated orientation (matched by
+// top/bottom edges (y=2 / y=334 in the 240x336 viewBox) or they clip. The
+// font size itself is capped by the tightest layout (rank 10 has 6 row
+// levels ~48px apart) so no rank's pips overlap their vertical neighbors -
+// keep PIP_FONT_SIZE at or below 36 unless the row bands above are widened.
+// Each rank keeps its original pip's upright/rotated orientation (matched by
 // position in the sorted row list) - only the row spacing changed.
+const PIP_FONT_SIZE = 36;
 const PIP_LAYOUTS: Record<number, { x: number; y: number; rot?: number }[]> = {
   2: [{ x: 0.5, y: 0.16 }, { x: 0.5, y: 0.87, rot: 180 }],
   3: [{ x: 0.5, y: 0.16 }, { x: 0.5, y: 0.515 }, { x: 0.5, y: 0.87, rot: 180 }],
@@ -122,7 +126,7 @@ export function PlayingCard({ card, className, dimmed }: { card: Card; className
           y={p.y * 336}
           textAnchor="middle"
           dominantBaseline="middle"
-          fontSize="68"
+          fontSize={PIP_FONT_SIZE}
           fill={color}
           transform={p.rot ? `rotate(${p.rot} ${p.x * 240} ${p.y * 336})` : undefined}
         >
